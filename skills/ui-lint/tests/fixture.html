@@ -1,0 +1,82 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ui-lint e2e fixture</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: #f8fafc; color: #0f172a; }
+  header { height: 64px; background: #fff; border-bottom: 1px solid #e2e8f0; padding: 0 24px; }
+  nav a { display: inline-block; vertical-align: top; margin: 22px 24px 0 0; height: 20px; color: #334155; text-decoration: none; font-size: 14px; }
+  /* DEFECT 1: Settings sits 3px lower than its row */
+  nav a.off { margin-top: 25px; }
+  .layout { display: flex; }
+  aside { width: 240px; padding: 24px 0; }
+  aside button { display: block; width: 180px; height: 36px; margin: 0 0 16px 24px; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; text-align: left; padding: 0 12px; }
+  /* DEFECT 2: third button indented 28px instead of 24px */
+  aside button.off { margin-left: 28px; }
+  main { flex: 1; padding: 24px; }
+  .stats { margin-bottom: 24px; }
+  .stat { display: inline-block; vertical-align: top; width: 240px; height: 96px; margin-right: 16px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; }
+  /* DEFECT 3: last stat card is 243px wide, siblings are 240px */
+  .stat.off { width: 243px; }
+  .stat b { display: block; font-size: 24px; }
+  .stat span { font-size: 12px; color: #64748b; }
+  .card { width: 640px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  /* DEFECT 4: gap before the last card is 23px, rhythm is 16px
+     (margin-top must EXCEED the sibling's 16px margin-bottom — vertical margins collapse) */
+  .card.gap-off { margin-top: 23px; }
+  .card h2 { margin: 0 0 8px; font-size: 16px; }
+  .card p { margin: 0; font-size: 14px; color: #475569; }
+  /* DEFECT 5: title clipped by its box */
+  .clip { width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+  /* intentional: indented callout (32px) — must NOT be flagged */
+  .callout { margin-left: 32px; width: 608px; background: #eff6ff; border-color: #bfdbfe; }
+  /* intentional: absolute badge over avatar — must NOT be flagged */
+  .avatar { position: relative; width: 48px; height: 48px; border-radius: 50%; background: #cbd5e1; display: inline-block; }
+  .badge { position: absolute; right: -2px; bottom: -2px; width: 14px; height: 14px; border-radius: 50%; background: #22c55e; border: 2px solid #fff; }
+</style>
+</head>
+<body>
+<header>
+  <nav>
+    <a href="#">Přehled</a>
+    <a href="#">Reporty</a>
+    <a href="#" class="off">Nastavení</a>
+    <a href="#">Fakturace</a>
+  </nav>
+</header>
+<div class="layout">
+  <aside>
+    <button>Dashboard</button>
+    <button>Zákazníci</button>
+    <button class="off">Objednávky</button>
+    <button>Sklad</button>
+  </aside>
+  <main>
+    <div class="stats">
+      <div class="stat"><b>1 254</b><span>objednávek</span></div>
+      <div class="stat"><b>89 %</b><span>spokojenost</span></div>
+      <div class="stat"><b>412 tis.</b><span>obrat (Kč)</span></div>
+      <div class="stat off"><b>37</b><span>reklamací</span></div>
+    </div>
+    <div class="card">
+      <div class="clip">Souhrnný přehled výkonnosti poboček za červen 2026</div>
+      <p>Meziměsíční srovnání tržeb a návštěvnosti.</p>
+    </div>
+    <div class="card">
+      <h2>Aktivita <span class="avatar"><span class="badge"></span></span></h2>
+      <p>Posledních 30 dní.</p>
+    </div>
+    <div class="card callout">
+      <h2>Tip</h2>
+      <p>Záměrně odsazená poznámka — optické odsazení 32 px.</p>
+    </div>
+    <div class="card gap-off">
+      <h2>Export</h2>
+      <p>Stažení podkladů pro účetnictví.</p>
+    </div>
+  </main>
+</div>
+</body>
+</html>
