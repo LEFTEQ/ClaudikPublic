@@ -42,6 +42,8 @@ export type GateInput = {
   worktreeDirty: boolean;
   isDraft: boolean;
   botApprovalOk: boolean;
+  /** Does the repo define any GitHub Actions workflow? See ciOk below. */
+  hasWorkflows: boolean;
 };
 
 export type GateSummary = {
@@ -50,12 +52,27 @@ export type GateSummary = {
   allPass: boolean; failed: string[];
 };
 
+/** True when the repo defines at least one GitHub Actions workflow. */
+export function repoHasWorkflows(mainClone: string): boolean {
+  const dir = join(mainClone, ".github", "workflows");
+  if (!existsSync(dir)) return false;
+  return readdirSync(dir).some((f) => f.endsWith(".yml") || f.endsWith(".yaml"));
+}
+
 export function summarizeGates(g: GateInput): GateSummary {
   const openOk = g.state.toUpperCase() === "OPEN";
   const draftOk = !g.isDraft;
   const cleanOk = !g.worktreeDirty;
   const mergeableOk = g.mergeable.toUpperCase() !== "CONFLICTING" && g.mergeStateStatus.toUpperCase() !== "DIRTY";
-  const ciOk = g.checks === "SUCCESS" || g.checks === "NONE";
+  // "NONE" means GitHub reported no checks AT ALL for this head. That is
+  // legitimate in a repo with no workflows — otherwise nothing there could ever
+  // merge. It is a lie in a repo that HAS workflows: path-filtered jobs that
+  // matched nothing, a run that never got a runner (an Actions outage), or a
+  // head pushed before any workflow triggered all produce NONE, and treating it
+  // as green means "no test ran" reads identically to "every test passed".
+  // Under --auto that is the difference between a verified merge and an
+  // unverified one, so absence is only a pass where absence is expected.
+  const ciOk = g.checks === "SUCCESS" || (g.checks === "NONE" && !g.hasWorkflows);
   const rd = g.reviewDecision.toUpperCase();
   const approvedOk = rd === "APPROVED" || rd === "";
   const botApprovalOk = g.botApprovalOk;
@@ -64,7 +81,10 @@ export function summarizeGates(g: GateInput): GateSummary {
   if (!draftOk) failed.push("draft");
   if (!cleanOk) failed.push("clean");
   if (!mergeableOk) failed.push("conflict");
-  if (!ciOk) failed.push("ci");
+  // Distinguished on purpose: "ci" is a red check, "ci-absent" is no check at
+  // all. A caller deciding whether to wait or to escalate needs to tell them
+  // apart, and the fix differs — rerun vs. work out why nothing ran.
+  if (!ciOk) failed.push(g.checks === "NONE" ? "ci-absent" : "ci");
   if (!approvedOk) failed.push("review");
   if (!botApprovalOk) failed.push("botReview");
   return { openOk, draftOk, cleanOk, mergeableOk, ciOk, approvedOk, botApprovalOk, allPass: failed.length === 0, failed };
@@ -141,7 +161,7 @@ export function substituteHookTokens(cmd: string, ctx: HookContext): string {
 }
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync} from "node:fs";
 import { basename, join } from "node:path";
 import { parseConfig } from "./sync-context.ts";
 import { repoRoot } from "./repo-root.ts";
@@ -238,6 +258,7 @@ async function main(): Promise<void> {
     state: pr.state, mergeable: pr.mergeable, mergeStateStatus: pr.mergeStateStatus,
     reviewDecision: pr.reviewDecision ?? "", checks, worktreeDirty: paths.dirty, isDraft: pr.isDraft,
     botApprovalOk: botApproval.ok,
+    hasWorkflows: repoHasWorkflows(paths.mainClone),
   });
 
   // Post-merge teardown hook (decision #6): a project may register AFTER_MERGE_CMD in

@@ -92,8 +92,9 @@ successor.
 
 ## Event → action map
 
-The Monitor (`pr-events.ts`, always in the watching session — NEVER inside a subagent)
-emits one line per state delta; none are ignorable. Inline mode: "round" = run it
+The watcher (`pr-events.ts` under the native `Monitor` tool, `persistent: true`, always
+armed in the watching session — NEVER inside a subagent) emits one line per state delta;
+each line re-invokes the session, and none are ignorable. Inline mode: "round" = run it
 here. Delegated: spawn `pr-<N>-r<K>`; while one runs, events QUEUE and one successor
 carries them all.
 
@@ -112,8 +113,11 @@ carries them all.
 
 Run an **initial round** immediately (existing backlog) and end it with
 `merge-precheck.ts` when resolved + green — an approval that predates the watch
-produces no event. `--once` = one round, no Monitor. Never use `ScheduleWakeup` as
-the watcher, and never a background agent as the watcher.
+produces no event. `--once` = one round, no Monitor. Never arm the watcher any other way: not
+`ScheduleWakeup`, not a background agent, and not backgrounded Bash — a background
+task notifies only on process exit, so its event lines sit unread until merge/close.
+A watcher that exits without emitting `merged`/`closed` crashed — re-arm it; its
+snapshot diff emits everything missed while it was down.
 
 ## Safety guardrails (non-negotiable)
 

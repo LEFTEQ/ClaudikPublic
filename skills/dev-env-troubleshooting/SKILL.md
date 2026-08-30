@@ -229,8 +229,15 @@ NestJS) bind IPv4 `*` by default — same port, different process.
 
 ## Don't hand-roll poll loops — and beware `pgrep -f` self-match
 
-Prefer the harness's native background-task completion signal (background Bash
-re-invokes on exit) over `until ! pgrep -f "bun install"; do sleep 5; done`.
+Match the mechanism to the notification count: **one** signal ("tell me when X
+finishes") → background Bash with a command that exits on the condition (the
+harness re-invokes on exit); **a stream** of events (log tail, PR watcher, a
+poll loop emitting per occurrence) → the native `Monitor` tool, where each
+stdout line re-invokes the session. Background Bash's incremental output never
+wakes the session — a multi-event watcher run that way sits unread until the
+process exits.
+
+Prefer these native signals over `until ! pgrep -f "bun install"; do sleep 5; done`.
 
 `pgrep -f` scans each process's FULL command line, so the loop's own shell
 (which literally contains `bun install` in the pattern) always matches →

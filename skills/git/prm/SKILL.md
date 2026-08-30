@@ -43,8 +43,8 @@ Flags: `--auto` (merge without asking once ready) · `--audit` (run the
 `auto-audit.md` pre-merge regression audit before any auto-merge — the human opts in
 by passing it; without it `--auto` merges on the precheck gates alone) · `--bg`
 (delegate rounds to fresh ephemeral subagents so this session stays free; implied for
-`all`) · `--once` (single round, no Monitor) · `--every <dur>` (Monitor poll cadence,
-default 5m) · `--cap <N>` (max concurrent delegated round agents, default 2) ·
+`all`) · `--once` (single round, no Monitor) · `--every <dur>` (watcher poll cadence,
+default 60s; the script floors at 30s) · `--cap <N>` (max concurrent delegated round agents, default 2) ·
 `--include-resolved` · `--no-conversation` (inline review threads only) · `--fable`
 (delegated rounds on the session model instead of Opus 5 — ⚠️ 2× cost on a Fable
 session; irrelevant inline — see `round.md`).
@@ -61,10 +61,15 @@ Per selected PR (`round.md` owns the round contract):
    (backlog; initializes the state file). Under `--bg`/`all`: spawn a fresh ephemeral
    round agent (`pr-<N>-r1`, Opus 5 by default, `--fable` for the session model —
    never a fork) instead.
-3. **Start the Monitor** (persistent):
-   `node ~/.claude/skills/git/_shared/bin/pr-events.ts <pr> --every-seconds <s> --repo <ABS repo path>`
+3. **Start the watcher — the native `Monitor` tool, `persistent: true`** (each
+   stdout line re-invokes this session; backgrounded Bash notifies only on
+   process exit, so a watcher armed that way delivers nothing until merge —
+   never arm it that way):
+   `Monitor({command: "node ~/.claude/skills/git/_shared/bin/pr-events.ts <pr> --every-seconds 60 --repo <ABS repo path>", persistent: true, description: "PR <N> events"})`
    (LITERAL absolute path). **Record its task id keyed by PR at arm time** — the
-   terminus must `TaskStop` it deterministically. It exits on merged/closed.
+   terminus must `TaskStop` it deterministically. It exits on merged/closed;
+   any earlier exit is a crashed watch — re-arm it immediately (its snapshot
+   diff emits everything missed while it was down).
 4. **React** to each event line per `round.md`'s Event → action map: work-bearing
    events run a round inline (or, under `--bg`/`all`, spawn `pr-<N>-r<K>` with
    queue + coalesce); skip own-push echoes; surface each round report; run the

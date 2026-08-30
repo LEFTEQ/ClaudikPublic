@@ -222,3 +222,28 @@ test("a project with no quiesce hook yields null, not an error", () => {
   const cfg = parseConfig("AFTER_MERGE_CMD=/wk:cleanup {slug}\n");
   assert.equal(cfg.BEFORE_REVIEW_CMD ?? null, null);
 });
+
+// "No checks reported" must not read as "all checks passed" in a repo that HAS
+// workflows. Path-filtered jobs that matched nothing, a run that never got a
+// runner (Actions outage, 2026-08-26), or a head pushed before anything
+// triggered all produce NONE — and under --auto that once stood one gate away
+// from merging code CI had never run on.
+test("NONE is a pass only where no workflow exists", () => {
+  const base = {
+    state: "OPEN", mergeable: "MERGEABLE", mergeStateStatus: "CLEAN",
+    reviewDecision: "APPROVED", worktreeDirty: false, isDraft: false, botApprovalOk: true,
+  } as const;
+
+  const withWorkflows = summarizeGates({ ...base, checks: "NONE", hasWorkflows: true });
+  assert.equal(withWorkflows.ciOk, false);
+  assert.ok(withWorkflows.failed.includes("ci-absent"),
+    "absence must be reported distinctly from a red check, so a caller can tell rerun from investigate");
+
+  const withoutWorkflows = summarizeGates({ ...base, checks: "NONE", hasWorkflows: false });
+  assert.equal(withoutWorkflows.ciOk, true, "a repo with no CI must still be mergeable");
+
+  assert.equal(summarizeGates({ ...base, checks: "SUCCESS", hasWorkflows: true }).ciOk, true);
+  const red = summarizeGates({ ...base, checks: "FAILURE", hasWorkflows: true });
+  assert.ok(red.failed.includes("ci") && !red.failed.includes("ci-absent"),
+    "a red check is 'ci', not 'ci-absent'");
+});
