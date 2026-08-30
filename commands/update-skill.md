@@ -12,7 +12,7 @@ From session evidence: what happened, the failure CLASS (not the instance), whic
 
 ## 2. Refine — never append
 
-Rewrite the relevant instruction(s) in place so the failure class is excluded: adjust the command pattern, add the constraint where the action is described, delete the misleading wording. No dated gotcha blocks, no "Note:"/"Warning:" appendices, no incident narrative — the skill must read as if written correctly the first time. Apply the doctrine in `~/.claude/commands/distill.md`; the edit usually leaves the skill shorter or equal.
+Rewrite the relevant instruction(s) in place so the failure class is excluded: adjust the command pattern, add the constraint where the action is described, delete the misleading wording. No dated gotcha blocks, no "Note:"/"Warning:" appendices, no incident narrative — the skill must read as if written correctly the first time. Apply the doctrine in `~/.claude/commands/distill.md` — including its frontmatter rule when the incident touches a description (`description` is the TRIGGER, when-to-invoke only); the edit usually leaves the skill shorter or equal.
 
 ## 3. Best home wins
 

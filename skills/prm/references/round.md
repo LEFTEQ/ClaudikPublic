@@ -43,7 +43,7 @@ Because the state lives here, ANY session or agent can pick up the next round.
 
 ### 0. Isolate (once) + load state
 
-`node ~/.claude/skills/git/_shared/bin/worktree.ts ensure <headRef> <pr>`
+`node ~/.claude/lib/git/bin/worktree.ts ensure <headRef> <pr>`
 → `{action, path, selfCreated, mainClone}`. Run EVERY git/test/lint command for this
 PR inside `path`. NEVER `git checkout`/`switch` and NEVER commit in `mainClone`, even
 if it currently has this branch checked out.
@@ -62,14 +62,14 @@ fix.
 
 ### 0.5 Quiesce (`BEFORE_REVIEW_CMD`) — every round
 
-`node ~/.claude/skills/git/_shared/bin/before-review.ts [--pr <N>]` (from `path`).
+`node ~/.claude/lib/git/bin/before-review.ts [--pr <N>]` (from `path`).
 Non-null `resolvedBeforeReviewCmd` → run it first; null → skip silently. Repeats every
 round because rounds invalidate what the checkout has running. It stops processes we
 own, never databases/containers.
 
 ### 1..N
 
-1. **Fetch:** `node ~/.claude/skills/git/_shared/bin/resolve-fetch.ts <pr> [--include-resolved] [--no-conversation]`
+1. **Fetch:** `node ~/.claude/lib/git/bin/resolve-fetch.ts <pr> [--include-resolved] [--no-conversation]`
    → envelope (`findings[]` across three surfaces, `skipped`, `counts`). Read
    `counts.nonThread` — a PR can be "all threads resolved" with a conversation ask
    still open.

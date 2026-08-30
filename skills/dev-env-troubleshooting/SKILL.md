@@ -213,7 +213,7 @@ Same family: `for f in $FILES` iterates **once** over the whole string, and
 `$(cmd)` unquoted stays a single word. Command substitution capturing a
 newline-separated list needs `${(f)"$(cmd)"}` or a `while read` loop.
 
-💡 `~/.claude/skills/git/_shared/bin/github-io.ts` now detects a whitespace-bearing
+💡 `~/.claude/lib/git/bin/github-io.ts` now detects a whitespace-bearing
 flag name and names this cause outright instead of blaming a missing field.
 
 ## Prefer `127.0.0.1` over `localhost` in env URLs

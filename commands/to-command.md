@@ -12,15 +12,7 @@ Index the session: the user's point beneath the phrasing, and the proven method 
 
 ## 2. Draft under doctrine
 
-Write for a very smart model. Per line: would it act differently without this line? No → delete.
-
-- Goal + constraints, not steps; directive voice. Steps only where order genuinely matters or the operation is fragile (then exact commands); high freedom everywhere else.
-- Never explain why an instruction exists, narrate hypotheticals, or restate default behavior (verification, self-correction, brevity, scope discipline — already covered by model + harness).
-- Never instruct the model to echo or explain its reasoning in output.
-- Compression is token-measured, clarity-first: cut filler, hedging, duplicates; symbols only when genuinely fewer tokens and unambiguous; never drop a not/never/only/except.
-- No session-specific nouns unless they ARE the point; consistent terminology; no time-sensitive facts.
-
-Frontmatter: user-typed trigger → `disable-model-invocation: true` + short human-facing description (zero context cost). Auto-invocable → third person, what it does + when it fires, concrete trigger terms — every session pays for this line.
+Apply the Doctrine and the frontmatter rule from `~/.claude/commands/distill.md` — the single home for both; never restate them here. Command-specific additions: directive voice; no session-specific nouns unless they ARE the point.
 
 Wire in `$ARGUMENTS` if the command takes input, and say what empty means. A large engine goes in a skill file the command Reads by absolute path (nested `skills/my/*` dirs don't register with the Skill tool).
 

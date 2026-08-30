@@ -69,13 +69,12 @@ bot wrongly assumes), teach the general rule:
 
 For any VALID / PARTIAL fix:
 
-1. **Hard skip-list:** `node ~/.claude/skills/git/_shared/bin/tdd-classify.ts <file>`
+1. **Hard skip-list:** `node ~/.claude/lib/git/bin/tdd-classify.ts <file>`
    non-null (`migration|deps|ci|iac|generated|docs`) → direct-fix. Also pure
    naming/style/comment changes.
 2. **Gate 1 — behavioral defect?** No wrong observable result for some input → direct-fix.
 3. **Gate 2 — unit/integration-reproducible without infra?** No → direct-fix, note why.
-4. Both YES → failing RED test first (compose `superpowers:test-driven-development`),
-   then the fix turns it GREEN.
+4. Both YES → write the failing RED test first, then the fix turns it GREEN.
 
 The reply always states which: `Fixed in <sha> + regression test` or
 `Fixed in <sha> (no test: <skip-category | gate-1 | gate-2>)`.

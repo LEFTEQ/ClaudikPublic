@@ -153,7 +153,7 @@ function fetchSnapshot(owner: string, repo: string, pr: number): Snapshot {
 let prevMergeable: string | undefined;
 
 /**
- * `--repo` accepts BOTH forms every other _shared script uses:
+ * `--repo` accepts BOTH forms every other lib/git script uses:
  *  - an absolute (or ./-relative) repo path → the anchor for repoRoot(), which
  *    reads the same flag from argv; owner/name then comes from the startup
  *    `gh repo view` lookup run in that anchored dir → nameWithOwner stays "".

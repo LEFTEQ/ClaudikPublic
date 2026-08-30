@@ -25,17 +25,7 @@ Settle at minimum:
 
 ## 4. Draft under doctrine
 
-Write for a very smart model. Per line: would it act differently without this line? No → delete.
-
-- Goal + constraints, not steps. Steps only where order genuinely matters or the operation is fragile (then exact commands, low freedom); high freedom everywhere else.
-- Never explain why an instruction exists, narrate hypotheticals, or restate default behavior (verification, self-correction, brevity, scope discipline — already covered by model + harness).
-- Never instruct the model to echo or explain its reasoning in output.
-- Compression is token-measured, clarity-first: cut filler, hedging, duplicates; symbols only when genuinely fewer tokens and unambiguous; never drop a not/never/only/except.
-- Consistent terminology; no time-sensitive facts; SKILL.md body < 500 lines; no model pinning.
-
-Frontmatter:
-- Auto-invocable → description in third person: what it does + when it fires, concrete trigger terms. It's the entire standing context cost — every session pays it.
-- Manual-only → `disable-model-invocation: true` + short human-facing description. Never spend description tokens saying "manual only".
+Apply the Doctrine and the frontmatter rule from `~/.claude/commands/distill.md` — the single home for both; never restate them here. Skill-specific additions: no model pinning.
 
 Then run the reviewer loop from `~/.claude/commands/distill.md` (Flow step 2) on the draft — converge, keep the metrics for delivery. No user round-trips inside the loop.
 

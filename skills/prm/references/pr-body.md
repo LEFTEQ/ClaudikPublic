@@ -1,7 +1,6 @@
 # pr-body — the PR description contract
 
-Shared by `prc`, `prm` and `ensure-pr`. Every PR these skills open **or watch** carries
-a body written to this contract.
+Every PR prm opens **or watches** carries a body written to this contract.
 
 Write for a reader with **zero context** — the repo owner months later, deciding *"is
 this still worth merging, and what does merging it cost me?"*. They need: what problem
@@ -46,7 +45,8 @@ Anything the merge does not do by itself, or `Nothing required.`
 
 ## Verification
 
-How this was actually proven — tests, hands-on QA. Be honest about what was NOT covered.
+How this was actually proven — tests, hands-on QA with the vitrinka board(s) linked.
+Be honest about what was NOT covered.
 ```
 
 `## Before merging` and `## After merging` are **never omitted** — an explicit `None.`
@@ -69,6 +69,15 @@ Sweep the diff before writing the two action sections (same irreversibles lens a
 | **Package publish** | Version bump needing `npm publish` / a tag | After |
 | **Merge order** | A PR that must land first, a stacked branch | Before, linked |
 | **Manual verification** | Something only a human on prod can confirm | After |
+
+## The vitrinka-links sweep
+
+Before writing, `list_boards` scoped to this repo/branch (and the `pr-<N>-<repo>` slug
+when the PR exists). Every board tied to this work lands in the body by its
+server-returned `shortUrl`: design/spec/brainstorming boards under `## Why`;
+testing sets, journeys, recorded sessions and review boards under `## Verification`.
+No board exists → link nothing (no placeholder line) and never `create_board` for the
+body's sake. When a board appears later in the PR's life, the upkeep rewrite adds it.
 
 **Deploy-on-merge repos** (merge to default = ship — vitrinka via Deployik, for one):
 anything the code needs to boot — env vars above all — is a **Before merging** item,

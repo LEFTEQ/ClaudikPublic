@@ -194,7 +194,7 @@ test("substituteHookTokens replaces every occurrence and leaves token-free comma
 // --- BEFORE_REVIEW_CMD (pre-review quiesce hook) -----------------------------
 // Symmetric with AFTER_MERGE_CMD. These pin the SHIPPED config shape: both keys
 // coexist in one file, comments between them do not swallow the next key, and
-// the hook resolves for /prc — which runs BEFORE a PR exists, i.e. with pr = 0.
+// the hook resolves for /prm's create path — which runs BEFORE a PR exists, i.e. with pr = 0.
 
 test("a config carrying BOTH hooks parses both, comments and all", () => {
   const cfg = parseConfig([
@@ -212,7 +212,7 @@ test("BEFORE_REVIEW_CMD substitutes like any other hook", () => {
   assert.equal(substituteHookTokens("/wk:pause {slug}", ctx), "/wk:pause pr-266");
 });
 
-test("the quiesce hook resolves before a PR exists (prc runs it with pr = 0)", () => {
+test("the quiesce hook resolves before a PR exists (prm's create path runs it with pr = 0)", () => {
   const noPr = { slug: "wk-quiesce", branch: "work/wk-quiesce", worktree: "/r/.worktrees/wk-quiesce", pr: 0 };
   assert.equal(substituteHookTokens("/wk:pause {slug}", noPr), "/wk:pause wk-quiesce");
   assert.equal(substituteHookTokens("cmd --pr {pr}", noPr), "cmd --pr 0");

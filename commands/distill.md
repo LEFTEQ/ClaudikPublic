@@ -16,8 +16,8 @@ Write for a very smart model. Per line: would it act differently without this li
 - Compression is token-measured, clarity-first: cut filler, hedging, duplicate statements of one rule. A symbol replaces words only when genuinely fewer tokens and unambiguous ("/" usually qualifies; "→" and invented abbreviations usually don't). Never drop a not/never/only/except. Never add words.
 - Consistent terminology throughout; no time-sensitive facts; references one level deep from SKILL.md; SKILL.md body < 500 lines.
 
-Descriptions (frontmatter):
-- Auto-invocable → third person, what it does + when it fires, concrete trigger terms. This is the entire standing context cost — every session pays it.
+Descriptions (frontmatter) — THE rule for every surface (to-skill, to-command, update-skill point here):
+- Auto-invocable → `description` is the TRIGGER, not a summary (the property name misleads): third person, ONLY when-to-invoke — the situations, intents, and concrete terms that should fire it. What the skill does belongs in the body; a name that echoes the tool/command it wraps is itself a trigger term. This is the entire standing context cost — every session pays it.
 - Manual-only → `disable-model-invocation: true` (drops it from model context entirely) + a short human-facing description for /help. Never spend description tokens saying "manual only".
 
 ## Flow

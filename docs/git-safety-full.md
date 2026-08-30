@@ -28,4 +28,4 @@ Enforced by `~/.claude/hooks/claude-guards` (PreToolUse → Bash; inactive insid
 
 Always on the default branch (standing arrangement 2026-08-08): after a merge, pull it — never switch it. Found on another branch → another session or the user is mid-something: report and skip.
 
-Related: `~/.claude/docs/orchestration-full.md` (worktree base-commit verification), `~/.claude/docs/git-commands.md`.
+Related: `~/.claude/docs/orchestration-full.md` (worktree base-commit verification), `~/.claude/skills/prm/SKILL.md` (the PR verb: create → review → merge → teardown).

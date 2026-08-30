@@ -12,7 +12,7 @@ production.
 
 ## When
 
-At the **ready terminus, immediately before `/merge`** — never earlier, never on a
+At the **ready terminus, immediately before the merge (`merge.md`)** — never earlier, never on a
 schedule. **Keyed to `headSha`:** record the audited sha; head moved (our push, an
 author revision, a force-update) ⇒ stale ⇒ re-run. `--once --auto --audit` still
 audits; once `--audit` is armed there is no path to merge without a fresh PASS.
@@ -47,7 +47,7 @@ accordingly.
 
 | Verdict | Meaning | Effect |
 |---|---|---|
-| **PASS** | No break found. | Proceed to `/merge`. |
+| **PASS** | No break found. | Proceed to the merge. |
 | **PASS-WITH-NOTES** | Non-blocking observations. | Proceed; notes go in the summary AND the merge comment. |
 | **BLOCK** | ≥1 real break. | No merge. Escalate below. |
 

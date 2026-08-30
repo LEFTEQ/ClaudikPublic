@@ -4,7 +4,7 @@
 // --repo (or GIT_SKILL_REPO) anchors the git calls via repo-root.ts; otherwise ambient cwd.
 //
 // Symmetric with AFTER_MERGE_CMD (resolved in merge-precheck.ts), but this one
-// must be usable BEFORE a PR exists (/prc creates the PR after quiescing) and
+// must be usable BEFORE a PR exists (/prm creates the PR after quiescing) and
 // cheap enough to re-run every /prm round. So it is deliberately git-only: no
 // `gh` call, no network, no PR number required.
 //
@@ -20,7 +20,7 @@
 // `resolvedBeforeReviewCmd` is null when the project registered no hook — that is
 // the normal case for most repos and means "skip the step", never an error.
 //
-// Usage:  node ~/.claude/skills/git/_shared/bin/before-review.ts [--pr <n>]
+// Usage:  node ~/.claude/lib/git/bin/before-review.ts [--pr <n>]
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";

@@ -280,8 +280,8 @@ async function main(): Promise<void> {
   // Pre-review quiesce hook (symmetric with AFTER_MERGE_CMD): a project may register
   // BEFORE_REVIEW_CMD to stop whatever the worktree has RUNNING before a review loop
   // starts. Entering the loop invalidates it — merge-from-main, dependency installs and
-  // codegen all thrash the disk while dev servers/emulators do stale work. /prc and /prm
-  // run this on entering the loop AND at the start of each round, so it must be
+  // codegen all thrash the disk while dev servers/emulators do stale work. /prm
+  // runs this on entering the loop AND at the start of each round, so it must be
   // idempotent and cheap (a good one is both).
   const beforeReviewCmd = cfg.BEFORE_REVIEW_CMD ?? null;
   const resolvedBeforeReviewCmd = beforeReviewCmd

@@ -1,14 +1,14 @@
-# Shared: running the deterministic layer's tests
+# Running the deterministic layer's tests
 
-`_shared/bin/*.ts` is the deterministic layer the git skills execute — PR selector
-parsing, review-thread triage, merge preconditions, worktree resolution, path
-classification, DB-url safety. The suite in `_shared/tests/` is its spec: the
-behaviours that aren't obvious from reading the code (which findings get filtered,
-which threads count as self, when the teardown hook must emit nothing).
+`lib/git/bin/*.ts` is the deterministic layer the git skills (prm, push-all, sync)
+execute — PR selector parsing, review-thread triage, merge preconditions, worktree
+resolution, path classification, DB-url safety. The suite in `lib/git/tests/` is its
+spec: the behaviours that aren't obvious from reading the code (which findings get
+filtered, which threads count as self, when the teardown hook must emit nothing).
 
 ```bash
-(cd ~/.claude/skills/git/_shared && bun test tests/)      # all 135
-(cd ~/.claude/skills/git/_shared && bun test tests/merge-precheck.test.ts)
+(cd ~/.claude/lib/git && bun test tests/)      # all of them
+(cd ~/.claude/lib/git && bun test tests/merge-precheck.test.ts)
 ```
 
 ## When to run it

@@ -83,7 +83,7 @@ export function buildCommand(sub: string, o: Record<string, string>): string[] {
         "-f", `content=${o.content || "+1"}`];
     case "review": {
       // A verdict-carrying PR review — what `comment` structurally cannot be. Needed by
-      // the `--auto` regression audit (`_shared/auto-audit.md`): a plain conversation
+      // the `--auto` regression audit (`auto-audit.md`): a plain conversation
       // comment is invisible to an autonomous PR author, whereas CHANGES_REQUESTED is the
       // one signal eve peacemaker's passive review loop (D6) matches to its claim and
       // answers with a revision. Blocking a machine-authored PR with a comment alone
