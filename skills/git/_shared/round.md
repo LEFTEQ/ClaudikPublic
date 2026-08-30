@@ -74,13 +74,22 @@ own, never databases/containers.
    `counts.nonThread` — a PR can be "all threads resolved" with a conversation ask
    still open.
 2. **Stop checks:** `state` closed or `merged` → report, done.
-3. **New-only filter:** skip ids already in `seen`.
+3. **New-only filter:** skip ids already in `seen` — **except a `resolvable` finding
+   whose thread is STILL OPEN.** `seen` records what a round decided to handle, not
+   what GitHub accepted, so a round that adds an id and then fails to deliver (a
+   mis-keyed `threadId`, an error after the reply, an interrupted round) makes that
+   finding invisible to every later round while it sits open forever. Observed live
+   2026-08-30 on devops-infra#236: 8 of 11 open threads were already in `seen`
+   with zero replies on GitHub, across four prior rounds. The fetch is the source of
+   truth — if it says a thread is unresolved, re-work it whatever `seen` claims.
 4. **Resolve each new finding** per `verdicts.md` (verify with `my:push-back`),
    delivered by `resolvable`:
    - `true` → `reply` into the thread, then `resolve-thread`.
    - `false` (review summary / conversation) → ONE batched quoting PR comment for the
      round + `react` on `conversation` sources. Add these ids to `seen` — GitHub
-     stores no resolved bit for them; a miss is an infinite loop.
+     stores no resolved bit for them; a miss is an infinite loop. Add them AFTER the
+     comment posts, never before: an id written on intent is the failure in the
+     new-only filter above, and for these there is no thread state to catch it.
 5. **Push once** after fixes pass test + lint + typecheck — head branch only, from
    `path`, one commit per item. Record `lastPushSha`.
 6. **Write state, report** the round (`output.md` shape). Delegated agents exit here —
