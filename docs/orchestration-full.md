@@ -16,6 +16,15 @@ These OVERRIDE the Workflow tool's built-in quality patterns (per-finding advers
 - Prefer phases inside one agent over agent-per-stage when stages share context (build → test → fix). Fan out only for genuinely disjoint work.
 - Reference failure: a verify phase once spawned 39 agents ≈ 1.8M tokens for work 2–3 batched agents would have done as well.
 
+## Fan-Out Over an External API — Rate Limits Are a Design Input
+
+When a command fetches from an external API (GitHub, GitLab, Jira, Linear, Slack) and then fans out to subagents that need more of the same API, design for the limit up front — never ship the naive version and patch later.
+
+- One consolidated GraphQL query instead of N REST calls with `--paginate`. For GitHub, one query pulls PR metadata + reviews + inline comments + thread-resolved status + diff hunks for ~200–300 of a 5000/hour budget.
+- Mirror before fan-out: `git fetch origin pull/<N>/head:refs/pr/<N>` and have subagents read locally — git uses a different quota path than `gh api`.
+- Cap concurrency: the secondary "abuse detection" limit trips on burstiness, not volume. ≤6 agents under 20 tasks, 4 for 20–40, 3 above that with each serializing its slice.
+- Preflight `rateLimit.remaining` from the first response (warn under 500) and cache the normalized fetch on disk so a re-run is free.
+
 ## Teammates & Long-Lived Sessions — Teardown Discipline
 
 Measured 2026-08-26: 64 swarm tmux sockets accumulated in a week, 18 still live, the
