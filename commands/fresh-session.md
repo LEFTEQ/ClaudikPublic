@@ -4,7 +4,7 @@ name: fresh-session
 description: "User wants to continue this work in a fresh session — compose a ready-to-paste initial prompt: exact intent, settled decisions, and full absolute paths to every file the new session must read."
 ---
 
-Compose the initial prompt for a fresh session that continues this one's work. Scope from $ARGUMENTS if given (one thread of the session), else the session's main thread. The deliverable is PROMPT TEXT in one fenced code block the user copies — not a file, not a memory pass (that's /handoff; offer it only if durability is also wanted).
+Compose the initial prompt for a fresh session that continues this one's work. Scope from $ARGUMENTS if given (one thread of the session), else the session's main thread. The deliverable is PROMPT TEXT in one fenced code block the user copies — not a file (a resumable, gated handoff is /handoff).
 
 Write it for a Claude with ZERO context — no session shorthand, no "as discussed". Structure, in order:
 

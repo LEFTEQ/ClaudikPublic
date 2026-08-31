@@ -183,6 +183,9 @@ emitted as `resolvedBeforeReviewCmd` by `merge-precheck.ts`. Per-round contract:
   the carve-out applies; never self-approve, dismiss, or `--admin` past a pending
   required bot.
 - Never `--force` a worktree removal; never switch or pull a dirty main clone.
+- **Stacked PRs: retarget the child BEFORE deleting a base branch.** Deleting the base
+  auto-closes every PR stacked on it. Recovery: push the old SHA back as a branch,
+  reopen the child, retarget it, then delete.
 - Dev-server kills and `down -v` stay surgically scoped as specified above.
 - Gates needing a human (approval, unresolvable conflict, repeated CI failure) STOP
   with a link-bearing report — autonomous ≠ overriding protections.
