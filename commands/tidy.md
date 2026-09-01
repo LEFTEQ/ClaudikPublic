@@ -62,15 +62,25 @@ on the keep-list.
 ### Classify each worktree (every one gets a status, not just candidates)
 
 - Dirtiness with numbers (`status --porcelain` count, `diff HEAD --shortstat`,
-  untracked count) · disk (`du -sh`) · holders (`lsof +D <path>` — listed in the
+  untracked count) · disk (`du -sh <path> | awk '{sub(/[KMGT]$/, "&B", $1); print $1}'`
+  — `du`'s bare `K`/`M`/`G` reads as a count of things, so ALWAYS render sizes with the
+  `B`: `11MB`, `952KB`, `1.2GB`, never `11M`. The `, $1` third arg is load-bearing:
+  `sub()` defaults to `$0`, and `du`'s record is `<size>\t<path>`, so an unanchored
+  `sub` appends the `B` to the PATH and silently leaves the size bare. `0B` already
+  carries its unit and is left alone.) · holders (`lsof +D <path>` — listed in the
   report; audit only lists, never kills).
+- **Sizes are a snapshot and go stale fastest on live worktrees** — a checkout still
+  being built or installed into grows between the audit and the report. Never re-use a
+  size across passes; measure at report time, and never let a size influence
+  candidacy (only the merge/dirty/PR guards decide that).
 - Classes by priority: **REMOVABLE** (branch DELETABLE + clean) · **BLOCKED-dirty**
   (DELETABLE + uncommitted, show counts) · **MERGEABLE** (unmerged, clean, probe
   clean → `merge → remove`) · **CONFLICTS ×N** · **DIRTY** (unmerged + uncommitted)
   · **BLOCKED-open-PR** (→ `/prm`) · `⚠ branch gone`.
 - **STRAY DIR** — under `.worktrees/` but unknown to git
   (`comm -23 <(ls -1 .worktrees | sort) <(git worktree list --porcelain | awk '/^worktree /{print $2}' | xargs -n1 basename | sort)`);
-  candidate only after `find <dir> -type f | head` + `du -sh` show build artifacts alone.
+  candidate only after `find <dir> -type f | head` + `du -sh` (rendered `…B` as above)
+  show build artifacts alone.
 
 ### Classify each compose stack
 
@@ -78,7 +88,7 @@ From `docker compose ls -a`, keep this repo's projects: `wt-<slug>` / `wk-<slug>
 (+ `-e2e` twins) and the repo's own name. Cross-reference worktree existence:
 **LIVE** (worktree exists → keep) · **ORPHAN running** (→ offer `down`) · **ORPHAN
 stopped** (→ offer full removal; `down -v` only under §3's carve-out; count volumes
-+ size).
++ size, same `…B` rendering).
 
 ### Print the report
 
@@ -97,9 +107,9 @@ REMOTE BRANCHES
 ┌ origin/feat/foo   merged · DELETABLE
 
 WORKTREES
-┌ .worktrees/foo        feat/foo · 1.2G
+┌ .worktrees/foo       feat/foo · 1.2GB
 │  merged · clean · REMOVABLE (+ wt-foo)
-┌ .worktrees/wip        feat/wip · 2.1G
+┌ .worktrees/wip       feat/wip · 2.1GB
 │  DIRTY 3 files · +47/−12 · CONFLICTS ×2
 │  holder: node (vite) pid 4242
 
@@ -111,7 +121,7 @@ SUMMARY
   deletable: 3 local · 2 remote
   removable worktrees: 1 · mergeable: 1
   orphan stacks: 2 · blocked: 1 · kept: 3 listed
-  reclaimable: ~3.6 GB
+  reclaimable: ~3.6GB
 fetch --prune: pruned 0 · gh OK
 ```
 

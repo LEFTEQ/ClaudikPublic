@@ -13,7 +13,7 @@ The primary checkout is the user's seat: never switch its branch, never stash, n
 
 ## Exemption — deploy-from-main repos (`WORKTREE_POLICY=never`)
 
-Infra repos (`devops-infra`, `prod-infra`, `web-infra`) and `~/.claude` itself: work directly on main in the primary checkout — the deploy/consumption unit is committed main-state. Infra sequencing: commit + push BEFORE any scp/deploy, never ship a dirty file. No-switch/no-stash still apply in full. See the `infra-ops` skill.
+Infra repos (`devops-infra`, `prod-infra`, `web-infra`), `~/.claude` itself, and `~/Exports` (a deliverables dump — extractions, PDFs, documents; nothing there is code under review): work directly on main in the primary checkout — the deploy/consumption unit is committed main-state. Infra sequencing: commit + push BEFORE any scp/deploy, never ship a dirty file. No-switch/no-stash still apply in full. See the `infra-ops` skill.
 
 ## Forbidden without explicit user approval
 
