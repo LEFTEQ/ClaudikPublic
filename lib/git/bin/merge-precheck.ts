@@ -124,6 +124,20 @@ export function parseMergePolicy(raw: string | undefined): { policy: MergePolicy
     : { policy: "review", invalid: raw ?? null };
 }
 
+// MERGE_METHOD: which `gh pr merge` flag lands the PR — merge (default, a merge commit),
+// squash (one commit titled after the PR), rebase. Repos on a squash-only GitHub setting
+// declare `MERGE_METHOD=squash` so the merge step never trips the server refusal.
+// Any other value → "merge" and the raw value is echoed so the caller can flag the typo.
+export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
+export type MergeMethod = (typeof MERGE_METHODS)[number];
+export function parseMergeMethod(raw: string | undefined): { method: MergeMethod; invalid: string | null } {
+  const v = (raw ?? "").trim().toLowerCase();
+  if (!v) return { method: "merge", invalid: null };
+  return (MERGE_METHODS as readonly string[]).includes(v)
+    ? { method: v as MergeMethod, invalid: null }
+    : { method: "merge", invalid: raw ?? null };
+}
+
 // REQUIRED_BOT_REVIEWERS is comma/space separated. Absent/empty → default review-bot[bot].
 export function parseBotList(raw: string | undefined): string[] {
   const items = (raw ?? "").split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -180,7 +194,7 @@ export function substituteHookTokens(cmd: string, ctx: HookContext): string {
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync} from "node:fs";
 import { basename, join } from "node:path";
-import { parseConfig } from "./sync-context.ts";
+import { readGitConfig } from "./sync-context.ts";
 import { repoRoot } from "./repo-root.ts";
 
 function sh(cmd: string, args: string[]): string {
@@ -263,10 +277,10 @@ async function main(): Promise<void> {
 
   // Bot-approval gate. The required-bot list comes from the SAME .claude.git.config that
   // holds AFTER_MERGE_CMD (read once below). Only OPEN PRs are worth a GraphQL round.
-  const cfgPath = join(paths.mainClone, ".claude/.claude.git.config");
-  const cfg = existsSync(cfgPath) ? parseConfig(readFileSync(cfgPath, "utf8")) : {};
+  const { cfg } = readGitConfig(paths.mainClone);
   const requiredBotReviewers = parseBotList(cfg.REQUIRED_BOT_REVIEWERS);
   const mergePolicy = parseMergePolicy(cfg.MERGE_POLICY);
+  const mergeMethod = parseMergeMethod(cfg.MERGE_METHOD);
   const botData = pr.state?.toUpperCase() === "OPEN"
     ? gatherBotData(owner, name, pr.number)
     : { requested: [], latestReviews: [] };
@@ -313,6 +327,7 @@ async function main(): Promise<void> {
     worktree: paths.worktree, mainClone: paths.mainClone, isWorktree: paths.isWorktree, slug,
     checks, gates, botApproval, requiredBotReviewers,
     mergePolicy: mergePolicy.policy, mergePolicyInvalid: mergePolicy.invalid,
+    mergeMethod: mergeMethod.method, mergeMethodInvalid: mergeMethod.invalid,
     afterMergeCmd, resolvedAfterMergeCmd,
     beforeReviewCmd, resolvedBeforeReviewCmd,
     raw: { state: pr.state, mergeable: pr.mergeable, mergeStateStatus: pr.mergeStateStatus, reviewDecision: pr.reviewDecision, isDraft: pr.isDraft },

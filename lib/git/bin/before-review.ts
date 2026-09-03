@@ -25,7 +25,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { substituteHookTokens } from "./merge-precheck.ts";
-import { parseConfig } from "./sync-context.ts";
+import { readGitConfig } from "./sync-context.ts";
 import { repoRoot } from "./repo-root.ts";
 
 function sh(cmd: string, args: string[]): string {
@@ -43,8 +43,7 @@ function main(): void {
   const mainClone = first ? first.slice("worktree ".length).trim() : worktree;
 
   const configPath = join(mainClone, ".claude/.claude.git.config");
-  const configFound = existsSync(configPath);
-  const cfg = configFound ? parseConfig(readFileSync(configPath, "utf8")) : {};
+  const { cfg, found: configFound } = readGitConfig(mainClone);
 
   const slug = basename(worktree);
   const beforeReviewCmd = cfg.BEFORE_REVIEW_CMD ?? null;

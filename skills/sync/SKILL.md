@@ -166,7 +166,7 @@ conflicts by bucket (regenerated / auto / gated + each gate's answer); deps / mi
   sync changes what's *committed*, never what's *checked out*.
 - Every git mutation names its repo: `git -C <ABS>`.
 
-## `.claude/.claude.git.config` (per-project, `KEY=value`, `#` comments; `config.local` overrides)
+## `.claude/.claude.git.config` (per-project, `KEY=value`, `#` comments; gitignored `.claude/.claude.git.config.local` overrides key by key)
 
 `--freeze` writes the auto-detected ones; a hand-written value always wins.
 
@@ -188,6 +188,6 @@ RUN_AFTER_SYNC=bun gen:types               # optional final step
 `GENERATED_PATHS` unset → conservative built-ins (`**/generated/**`,
 `**/__generated__/**`, `**/*.gen.*`, `**/*.generated.*`,
 `**/openapi*.{json,yaml,yml}`, `**/schema.graphql`, `**/graphql.schema.json`,
-`**/prisma/client/**`). The same file carries prm's keys (`AFTER_MERGE_CMD`,
+`**/prisma/client/**`). The same file carries prm's keys (`MERGE_POLICY`, `MERGE_METHOD`, `AFTER_MERGE_CMD`,
 `BEFORE_REVIEW_CMD`, `REQUIRED_BOT_REVIEWERS`) — see
 `~/.claude/skills/prm/references/merge.md`.

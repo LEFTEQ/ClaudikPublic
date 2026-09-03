@@ -1,8 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   parseConfig, packageManager, installCmdForLockfile, isLocalDbUrl, dbHostOf,
-  detectMode, globToRegExp, isGeneratedPath, freezeConfig, DEFAULT_GENERATED_GLOBS,
+  detectMode, globToRegExp, isGeneratedPath, freezeConfig, DEFAULT_GENERATED_GLOBS, readGitConfig,
 } from "../bin/sync-context.ts";
 
 test("parseConfig reads KEY=value, skips comments/blanks, strips quotes", () => {
@@ -122,4 +125,13 @@ test("freezeConfig on an empty config writes every resolved key", () => {
   assert.match(text, /^INSTALL_CMD=pnpm install$/m);
   // Round-trips through the parser it will be read back with.
   assert.equal(parseConfig(text).INSTALL_CMD, "pnpm install");
+});
+
+test("readGitConfig: .claude.git.config.local overlays the committed file, key by key", () => {
+  const root = mkdtempSync(join(tmpdir(), "gitcfg-"));
+  mkdirSync(join(root, ".claude"));
+  writeFileSync(join(root, ".claude/.claude.git.config"), "DEFAULT_BRANCH=main\nMERGE_METHOD=squash\n");
+  writeFileSync(join(root, ".claude/.claude.git.config.local"), "DEFAULT_BRANCH=devlp\n");
+  assert.deepEqual(readGitConfig(root), { cfg: { DEFAULT_BRANCH: "devlp", MERGE_METHOD: "squash" }, found: true });
+  assert.deepEqual(readGitConfig(join(root, "nope")), { cfg: {}, found: false });
 });

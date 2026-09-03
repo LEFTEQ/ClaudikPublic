@@ -9,6 +9,22 @@
 
 export type GitConfig = Record<string, string>;
 
+// The per-repo git contract: <root>/.claude/.claude.git.config (committed, shared with
+// every collaborator) overlaid by <root>/.claude/.claude.git.config.local (gitignored —
+// one machine's own defaults, e.g. a DEFAULT_BRANCH the rest of the team has not adopted).
+// A key in .local wins; either file may be absent.
+export function readGitConfig(root: string): { cfg: GitConfig; found: boolean } {
+  const merged: GitConfig = {};
+  let found = false;
+  for (const name of [".claude/.claude.git.config", ".claude/.claude.git.config.local"]) {
+    const p = join(root, name);
+    if (!existsSync(p)) continue;
+    found = true;
+    Object.assign(merged, parseConfig(readFileSync(p, "utf8")));
+  }
+  return { cfg: merged, found };
+}
+
 export function parseConfig(text: string): GitConfig {
   const out: GitConfig = {};
   for (const raw of text.split("\n")) {
@@ -162,9 +178,8 @@ async function main(): Promise<void> {
   const root = repoRoot();
   const at = (p: string) => join(root, p);
 
-  const configPath = at(".claude/.claude.git.config");
-  const configFound = existsSync(configPath);
-  const cfg = configFound ? parseConfig(readFileSync(configPath, "utf8")) : {};
+  const configPath = at(".claude/.claude.git.config"); // --freeze writes the committed file
+  const { cfg, found: configFound } = readGitConfig(root);
 
   const LOCKFILES = ["pnpm-lock.yaml", "bun.lock", "bun.lockb", "yarn.lock", "package-lock.json"];
   const lockfiles = LOCKFILES.filter((f) => existsSync(at(f)));

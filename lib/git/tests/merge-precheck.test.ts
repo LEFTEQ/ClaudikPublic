@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { summarizeChecks, summarizeGates, substituteHookTokens, summarizeBotApproval, parseBotList, canonicalizeBotLogin, parseMergePolicy } from "../bin/merge-precheck.ts";
+import { summarizeChecks, summarizeGates, substituteHookTokens, summarizeBotApproval, parseBotList, canonicalizeBotLogin, parseMergePolicy, parseMergeMethod } from "../bin/merge-precheck.ts";
 import { parseConfig } from "../bin/sync-context.ts";
 
 test("no checks configured → NONE", () => {
@@ -246,6 +246,13 @@ test("NONE is a pass only where no workflow exists", () => {
   const red = summarizeGates({ ...base, checks: "FAILURE", hasWorkflows: true });
   assert.ok(red.failed.includes("ci") && !red.failed.includes("ci-absent"),
     "a red check is 'ci', not 'ci-absent'");
+});
+
+test("MERGE_METHOD: absent → merge; squash → squash; a typo falls back to merge and is echoed", () => {
+  assert.deepEqual(parseMergeMethod(undefined), { method: "merge", invalid: null });
+  assert.deepEqual(parseMergeMethod(" Squash "), { method: "squash", invalid: null });
+  assert.deepEqual(parseMergeMethod("rebase"), { method: "rebase", invalid: null });
+  assert.deepEqual(parseMergeMethod("fast-forward"), { method: "merge", invalid: "fast-forward" });
 });
 
 test("MERGE_POLICY: absent → review; self → self; a typo falls back to review and is echoed", () => {

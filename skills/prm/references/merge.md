@@ -57,8 +57,10 @@ A STOP prints the blocker + PR URL and stops. 6 iterations still red → STOP an
 
 ## Merge
 
-`gh pr merge <pr> --merge --delete-branch` — append `--admin` only when the user passed
-it or the carve-out applies. Merge commit; remote branch deleted.
+`gh pr merge <pr> --<mergeMethod> --delete-branch` — `mergeMethod` is `merge-precheck`'s
+`MERGE_METHOD` reading (default `merge`; `squash` on squash-only repos). Append `--admin`
+only when the user passed it or the carve-out applies. Remote branch deleted. A non-null
+`mergeMethodInvalid` is a typo in the config: say so, run as `merge`.
 
 ## Solo-owner carve-out — unsatisfiable review gate
 
@@ -142,6 +144,15 @@ Two non-negotiables: (a) every git op runs from the main clone via `git -C <main
      whose label is not `wt-*`.
    - otherwise → `docker compose -p "$P" down` (NO `-v` — volumes preserved).
    Never a machine-wide `wt-*` sweep — that stays the interactive `/me:cleanup:processes`.
+4b. **Devbox workspace** (after either path, while `<worktree>` is known): if the
+   removed worktree carried a `devbox.yaml` (or `devbox.worktree.yaml`) — check
+   BEFORE removal, or ask the box: `git -C <mainClone> ls-tree HEAD devbox.yaml` —
+   run `devbox reap --worktree <worktree> --json` from the main clone. It frees the
+   branch's port window and stops its stack; it applies exactly `devbox gc`'s verdict,
+   so it can never reap more than gc would. `ok:false` with `WS_NOT_DEAD` → report the
+   diagnostic's `fix` line, never retry, never `devbox down` on your own; `ok:true`
+   with `WS_NO_RUNTIME_META` (never instantiated) is a clean no-op. `devbox` missing
+   from PATH → skip silently (a non-devbox Mac).
 5. `git -C <mainClone> fetch --prune` (always, after either path).
 6. **Pull the main clone — never switch it.** It is ALWAYS on the default branch (the
    standing arrangement, not something to verify-then-correct): `status --porcelain`
@@ -163,6 +174,10 @@ Same `KEY=value` file `/sync` reads, in `<repo>/.claude/`:
 # Monitor, no hand-back "waiting on review". Still never past red CI, a conflict, a
 # pending required bot, or a PR authored by someone else. Worktree rules unchanged.
 MERGE_POLICY=self
+
+# Which `gh pr merge` flag lands a green PR: merge (default, merge commit) | squash (one
+# commit titled after the PR — set this on squash-only repos) | rebase.
+MERGE_METHOD=squash
 
 # Runs INSTEAD of the generic worktree-remove + branch -d after a successful merge.
 # Tokens substituted by merge-precheck.ts: {slug} {branch} {worktree} {pr}
