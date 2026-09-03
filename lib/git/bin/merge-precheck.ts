@@ -107,6 +107,23 @@ export type BotApprovalInput = {
 
 export type BotApprovalSummary = { ok: boolean; required: string[]; pending: string[] };
 
+// MERGE_POLICY: how a PR reaches the default branch once its gate is green.
+//   review (default) — wait for the human/bot review loop (merge.md gates as written).
+//   self             — solo-owner repo: the PR is the trail, not a review; ensure-pr labels
+//                      it `eve-ignore` (no eve review) and merge.md admin-merges as soon as
+//                      clean + CI + no-conflict pass, skipping the review round entirely.
+// Any other value → "review" (the safe reading) and the raw value is echoed so the caller
+// can flag the typo instead of silently running the strict flow.
+export const MERGE_POLICIES = ["review", "self"] as const;
+export type MergePolicy = (typeof MERGE_POLICIES)[number];
+export function parseMergePolicy(raw: string | undefined): { policy: MergePolicy; invalid: string | null } {
+  const v = (raw ?? "").trim().toLowerCase();
+  if (!v) return { policy: "review", invalid: null };
+  return (MERGE_POLICIES as readonly string[]).includes(v)
+    ? { policy: v as MergePolicy, invalid: null }
+    : { policy: "review", invalid: raw ?? null };
+}
+
 // REQUIRED_BOT_REVIEWERS is comma/space separated. Absent/empty → default review-bot[bot].
 export function parseBotList(raw: string | undefined): string[] {
   const items = (raw ?? "").split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -249,6 +266,7 @@ async function main(): Promise<void> {
   const cfgPath = join(paths.mainClone, ".claude/.claude.git.config");
   const cfg = existsSync(cfgPath) ? parseConfig(readFileSync(cfgPath, "utf8")) : {};
   const requiredBotReviewers = parseBotList(cfg.REQUIRED_BOT_REVIEWERS);
+  const mergePolicy = parseMergePolicy(cfg.MERGE_POLICY);
   const botData = pr.state?.toUpperCase() === "OPEN"
     ? gatherBotData(owner, name, pr.number)
     : { requested: [], latestReviews: [] };
@@ -294,6 +312,7 @@ async function main(): Promise<void> {
     branch: paths.branch, defaultBranch, onDefaultBranch: paths.branch === defaultBranch,
     worktree: paths.worktree, mainClone: paths.mainClone, isWorktree: paths.isWorktree, slug,
     checks, gates, botApproval, requiredBotReviewers,
+    mergePolicy: mergePolicy.policy, mergePolicyInvalid: mergePolicy.invalid,
     afterMergeCmd, resolvedAfterMergeCmd,
     beforeReviewCmd, resolvedBeforeReviewCmd,
     raw: { state: pr.state, mergeable: pr.mergeable, mergeStateStatus: pr.mergeStateStatus, reviewDecision: pr.reviewDecision, isDraft: pr.isDraft },

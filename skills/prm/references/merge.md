@@ -19,7 +19,8 @@ in a worktree → the anchor is wrong; re-run, never act on that envelope.
 worktree, mainClone, isWorktree, slug, checks, gates, botApproval,
 requiredBotReviewers, afterMergeCmd, resolvedAfterMergeCmd, raw}`.
 `botApproval = {ok, required[], pending[]}`; `gates.botApprovalOk` mirrors it as the
-`botReview` gate.
+`botReview` gate. `mergePolicy` is `review` (default) or `self` — see the keys below;
+a non-null `mergePolicyInvalid` is a typo in the config: say so, run as `review`.
 
 Hard guards — STOP immediately:
 - `onDefaultBranch` → "On the default branch — nothing to merge here." Never tell the
@@ -35,7 +36,7 @@ While `gates.allPass === false`, act per failed gate, then re-run merge-precheck
 | `clean` (dirty worktree) | commit the whole tree per `~/.claude/skills/push-all/SKILL.md` commit doctrine, then `git push` |
 | `ci` / `ci-absent` | the CI fix loop below |
 | `review` + `CHANGES_REQUESTED` | a round (resolve comments + push). Still not `APPROVED` → **STOP: "blocked on human approval"** |
-| `review` + `REVIEW_REQUIRED` | solo-owner carve-out applies (below) → `--admin` merge, not a STOP. Otherwise **STOP: "blocked on human approval"** — never self-approve (`--admin` does NOT fake an approval) |
+| `review` + `REVIEW_REQUIRED` | `mergePolicy === "self"` → the review gate is not a gate: `--admin` merge now (no round, no watcher). Else the solo-owner carve-out applies (below) → `--admin` merge, not a STOP. Otherwise **STOP: "blocked on human approval"** — never self-approve (`--admin` does NOT fake an approval) |
 | `botReview` (`botApproval.pending` names which) | bot has open threads → a round (resolve + push); the bot re-reviews on the push. Still pending → **STOP: "blocked on bot review (`<bot>` pending)"** — never self-approve, dismiss, or `--admin` past a required bot |
 | `conflict` | `gh pr update-branch <pr>`, re-check. Still conflicting → **STOP: "conflicts need manual resolution"** |
 | `draft` | `gh pr ready <pr>`, re-check |
@@ -155,6 +156,14 @@ Two non-negotiables: (a) every git op runs from the main clone via `git -C <main
 Same `KEY=value` file `/sync` reads, in `<repo>/.claude/`:
 
 ```
+# How a green PR reaches the default branch. review (default): the loop as written —
+# rounds, watcher, human/bot approval. self: a solo-owner repo where the PR is the
+# TRAIL, not a review — ensure-pr labels it `eve-ignore` (eve never reviews it), and
+# once clean + CI + mergeable pass the merge is `--admin` immediately: no round, no
+# Monitor, no hand-back "waiting on review". Still never past red CI, a conflict, a
+# pending required bot, or a PR authored by someone else. Worktree rules unchanged.
+MERGE_POLICY=self
+
 # Runs INSTEAD of the generic worktree-remove + branch -d after a successful merge.
 # Tokens substituted by merge-precheck.ts: {slug} {branch} {worktree} {pr}
 AFTER_MERGE_CMD=/wk:cleanup {slug} --remove --yes --delete-remote

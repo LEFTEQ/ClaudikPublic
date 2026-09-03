@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { summarizeChecks, summarizeGates, substituteHookTokens, summarizeBotApproval, parseBotList, canonicalizeBotLogin } from "../bin/merge-precheck.ts";
+import { summarizeChecks, summarizeGates, substituteHookTokens, summarizeBotApproval, parseBotList, canonicalizeBotLogin, parseMergePolicy } from "../bin/merge-precheck.ts";
 import { parseConfig } from "../bin/sync-context.ts";
 
 test("no checks configured → NONE", () => {
@@ -246,4 +246,10 @@ test("NONE is a pass only where no workflow exists", () => {
   const red = summarizeGates({ ...base, checks: "FAILURE", hasWorkflows: true });
   assert.ok(red.failed.includes("ci") && !red.failed.includes("ci-absent"),
     "a red check is 'ci', not 'ci-absent'");
+});
+
+test("MERGE_POLICY: absent → review; self → self; a typo falls back to review and is echoed", () => {
+  assert.deepEqual(parseMergePolicy(undefined), { policy: "review", invalid: null });
+  assert.deepEqual(parseMergePolicy(" Self "), { policy: "self", invalid: null });
+  assert.deepEqual(parseMergePolicy("auto"), { policy: "review", invalid: "auto" });
 });

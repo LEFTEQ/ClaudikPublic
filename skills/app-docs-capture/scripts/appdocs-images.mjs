@@ -154,6 +154,6 @@ if (cmd === 'add') {
   }
   ok(`pruned ${n} empty dir(s)`);
 } else {
-  console.log('usage: appdocs-images.mjs <add|bump|list|check|prune> …  (see references/docs-structure.md)');
+  console.log('usage: appdocs-images.mjs <add|bump|list|check|prune> …  (layout + commands documented at the top of this file)');
   process.exit(cmd ? 1 : 0);
 }

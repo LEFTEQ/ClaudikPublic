@@ -5,6 +5,7 @@ The primary checkout is the user's seat: never switch its branch, never stash, n
 ## Worktrees
 
 - `git worktree add .worktrees/<name> -b <branch>` — in-repo, never sibling directories; ensure `.worktrees/` is gitignored first. Create directly — the repo's `WORKTREE_POLICY` (`<repo>/.claude/.claude.git.config`) is the only gate: `always` (default when absent) · `feature` (worktree only for new-feature work) · `never`.
+- The worktree rule is about the primary checkout, not about review: `MERGE_POLICY=self` in the same config file (see `~/.claude/skills/prm/references/merge.md`) keeps the worktree + PR and drops the review loop — the PR is labelled `eve-ignore` and admin-merged the moment its gate is green.
 - A worktree already holds the branch you need (`git worktree list`) → use it; never create a spare per task.
 - The user may say "work in the current branch" — then commit in place.
 - Commit only your own change-set, path-scoped; unrelated parallel-session changes are never stashed, reverted, or bundled in.

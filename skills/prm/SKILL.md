@@ -158,6 +158,7 @@ head moved ⇒ stale ⇒ re-run. Inconclusive counts as BLOCK.
 | ready + `--audit` **BLOCK** | No merge. Foreign author → ONE CHANGES_REQUESTED review via `github-io.ts review`. Our PR → a round fixes the findings and pushes, then re-audit. Monitor stays alive. |
 | **3rd consecutive BLOCK** | Stop: `TaskStop` the Monitor, report findings + URL, hand to the user. |
 | `REVIEW_REQUIRED` / `CHANGES_REQUESTED` (human) | Keep watching, never bypass — EXCEPT the solo-owner carve-out (`merge.md`): precheck → (audit if `--audit`) → `--admin` merge. Never self-approve. |
+| repo has `MERGE_POLICY=self` (`merge-precheck` → `mergePolicy`) | No review loop at all: create (labelled `eve-ignore`) → gate (clean, CI, mergeable, required bots) → `--admin` merge → teardown, in one pass. `--auto` is implied; a red gate still STOPs as in `merge.md`. |
 | required **bot** approval pending | Keep watching; it clears only via the bot's own APPROVED review, prompted by resolving its findings and pushing. |
 | CI red, CONFLICTING, draft | Unchanged; every `merge.md` STOP still STOPs. |
 

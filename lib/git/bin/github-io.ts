@@ -24,7 +24,7 @@ Usage: node github-io.ts <subcommand> --key value ...
   react             --owner O --repo R --commentId ID [--content +1]
   review            --owner O --repo R --pr N --event request-changes|comment --body TEXT
   resolve-thread    --threadId PRRT_...
-  create-pr         --head BRANCH --base BRANCH [--title T] [--body B] [--draft]
+  create-pr         --head BRANCH --base BRANCH [--title T] [--body B] [--draft] [--label L]
   find-run          --sha SHA
   watch-run         --runId ID
   failed-logs       --runId ID
@@ -114,7 +114,9 @@ export function buildCommand(sub: string, o: Record<string, string>): string[] {
       return ["pr", "create", "--head", req(o, "head"), "--base", req(o, "base"), "--fill",
         ...(o.title ? ["--title", o.title] : []),
         ...(o.body ? ["--body", o.body] : []),
-        ...("draft" in o ? ["--draft"] : [])];
+        ...("draft" in o ? ["--draft"] : []),
+        // MERGE_POLICY=self repos: `eve-ignore` keeps eve off a PR nobody will wait on.
+        ...(o.label ? ["--label", o.label] : [])];
     default:
       throw new Error(`Unknown github-io subcommand: ${sub}`);
   }
