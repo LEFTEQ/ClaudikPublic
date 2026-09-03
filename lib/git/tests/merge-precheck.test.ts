@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { summarizeChecks, summarizeGates, substituteHookTokens, summarizeBotApproval, parseBotList, canonicalizeBotLogin, parseMergePolicy, parseMergeMethod } from "../bin/merge-precheck.ts";
+import { summarizeChecks, summarizeGates, substituteHookTokens, summarizeBotApproval, parseBotList, canonicalizeBotLogin, parseMergePolicy, parseMergeMethod, resolveDefaultBranch } from "../bin/merge-precheck.ts";
 import { parseConfig } from "../bin/sync-context.ts";
 
 test("no checks configured → NONE", () => {
@@ -259,4 +259,21 @@ test("MERGE_POLICY: absent → review; self → self; a typo falls back to revie
   assert.deepEqual(parseMergePolicy(undefined), { policy: "review", invalid: null });
   assert.deepEqual(parseMergePolicy(" Self "), { policy: "self", invalid: null });
   assert.deepEqual(parseMergePolicy("auto"), { policy: "review", invalid: "auto" });
+});
+
+// DEFAULT_BRANCH: a machine adopting a new integration branch ahead of the team sets it in
+// the gitignored .claude.git.config.local; everyone else keeps following GitHub's default.
+test("resolveDefaultBranch: no override → GitHub default; GitHub unknown → main", () => {
+  assert.equal(resolveDefaultBranch({}, "master"), "master");
+  assert.equal(resolveDefaultBranch({}, undefined), "main");
+  assert.equal(resolveDefaultBranch({}, ""), "main");
+});
+
+test("resolveDefaultBranch: DEFAULT_BRANCH overlay wins over GitHub's default", () => {
+  assert.equal(resolveDefaultBranch({ DEFAULT_BRANCH: "devlp" }, "main"), "devlp");
+  assert.equal(resolveDefaultBranch(parseConfig("MERGE_METHOD=squash\nDEFAULT_BRANCH=devlp\n"), "master"), "devlp");
+});
+
+test("resolveDefaultBranch: blank DEFAULT_BRANCH is not an override", () => {
+  assert.equal(resolveDefaultBranch({ DEFAULT_BRANCH: "  " }, "main"), "main");
 });

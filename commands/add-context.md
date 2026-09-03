@@ -10,4 +10,4 @@ Read the doc, then collect what this session knows that its next reader won't: p
 
 Fold each fact into the doc's matching section (handoffs follow the `/handoff` runbook shape: Intent / Affected / Prerequisites / Phases / Context / Out of scope). Facts with no home go under `## Context added <YYYY-MM-DD HH:MM>`. Where existing content is wrong in a way that would cause a wrong first move, correct it in place and list the correction in that section. Never restructure the plan, change scope, or reorder phases or their gates except to correct a stale fact inside them. Keep the doc ≤200 lines — cut additions, not the original.
 
-Only add facts the next session would otherwise act wrongly without; skip anything derivable from the repo, CLAUDE.md, or committed docs.
+Only add facts the next session would otherwise act wrongly without; skip anything derivable from the repo, CLAUDE.md, or committed docs. A handoff also gets this session's id (`printenv CLAUDE_CODE_SESSION_ID`) appended to its `sessions`.

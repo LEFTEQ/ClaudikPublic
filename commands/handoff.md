@@ -17,11 +17,29 @@ Package the in-flight work as a self-sufficient handoff a fresh session resumes 
 
 Default is a markdown runbook. When the work spans repos or chains dependent features with clear mechanical steps, propose the workflow form before writing.
 
-One file: `~/.claude/handoffs/<project-slug>/<slug>.md` (project-slug = repo dir name, slugified). Split into a `<slug>/` directory — `handoff.md` + per-app context files, plus `workflow.mjs` in workflow form — only when one file would cramp multi-app context. Same slug → overwrite silently; handoffs are single-use.
+One file: `~/.claude/handoffs/<project-slug>/<slug>.md` (project-slug = repo dir name, slugified). Split into a `<slug>/` directory — `handoff.md` + per-app context files, plus `workflow.mjs` in workflow form — only when one file would cramp multi-app context. Same slug → overwrite the live file; `<project-slug>/archive/` holds finished handoffs and is never written by /handoff.
+
+## Frontmatter
+
+Every handoff (`<slug>.md` or `<slug>/handoff.md`) opens with:
+
+```yaml
+---
+name: <slug>
+description: <one line — what a reader resumes here>
+status: open                       # open · in-progress · done · abandoned — /continue advances it
+created: YYYY-MM-DD
+created-by: <this session's id>    # printenv CLAUDE_CODE_SESSION_ID
+sessions:                          # every session that wrote, enriched or drove it — creator first
+  - <this session's id>
+---
+```
+
+`memorylint` refuses a write that breaks this shape (the same hook that guards memory); `memorylint check ~/.claude/handoffs` audits the tree.
 
 ## Runbook shape
 
-Header (created, branch @ sha, tree state), then:
+Header (branch @ sha, tree state), then:
 
 - **Intent** — why the feature exists, the user-facing goal; 2–4 sentences.
 - **Affected** — each app/repo with the key paths and what changes there.

@@ -255,6 +255,9 @@ export function bucketNonThread(
 import { execFileSync } from "node:child_process";
 
 import { repoRoot } from "./repo-root.ts";
+import { readGitConfig } from "./sync-context.ts";
+import { resolveDefaultBranch } from "./merge-precheck.ts";
+import { dirname } from "node:path";
 
 function sh(cmd: string, args: string[]): string {
   return execFileSync(cmd, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: 120_000, cwd: repoRoot() });
@@ -291,11 +294,20 @@ query($owner:String!, $repo:String!, $pr:Int!, $threadCursor:String) {
   rateLimit { remaining cost resetAt }
 }`;
 
+// The git contract's per-machine overlay (.claude.git.config.local) is gitignored, so it
+// only exists in the MAIN clone — never in a worktree. Resolve the main clone from the
+// common git dir before reading it.
+function mainCloneOf(root: string): string {
+  const commonDir = sh("git", ["-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"]).trim();
+  return dirname(commonDir);
+}
+
 function currentRepo(): { owner: string; repo: string; defaultBranch: string } {
   const out = sh("gh", ["repo", "view", "--json", "nameWithOwner,defaultBranchRef"]);
   const j = JSON.parse(out);
   const [owner, repo] = j.nameWithOwner.split("/");
-  return { owner, repo, defaultBranch: j.defaultBranchRef?.name ?? "main" };
+  const { cfg } = readGitConfig(mainCloneOf(repoRoot()));
+  return { owner, repo, defaultBranch: resolveDefaultBranch(cfg, j.defaultBranchRef?.name) };
 }
 
 type Target =

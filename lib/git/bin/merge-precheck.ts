@@ -183,6 +183,16 @@ export type HookContext = { slug: string; branch: string; worktree: string; pr: 
 
 // Resolve {slug}/{branch}/{worktree}/{pr} in a configured AFTER_MERGE_CMD. Every occurrence
 // of each token is replaced; a command with no tokens is returned unchanged.
+// The branch a green PR lands on and the seat the main clone is expected to sit on.
+// GitHub's default branch is the team-wide answer; a machine adopting a new integration
+// branch ahead of the team overrides it with DEFAULT_BRANCH in the gitignored
+// .claude/.claude.git.config.local (same overlay /sync reads). Blank/absent → GitHub's.
+export function resolveDefaultBranch(cfg: Record<string, string>, githubDefault: string | undefined | null): string {
+  const override = (cfg.DEFAULT_BRANCH ?? "").trim();
+  if (override) return override;
+  return (githubDefault ?? "").trim() || "main";
+}
+
 export function substituteHookTokens(cmd: string, ctx: HookContext): string {
   return cmd
     .replaceAll("{slug}", ctx.slug)
@@ -269,7 +279,6 @@ async function main(): Promise<void> {
   const prArg = process.argv.slice(2).filter((a) => !a.startsWith("--"))[0];
   const repo = JSON.parse(sh("gh", ["repo", "view", "--json", "nameWithOwner,defaultBranchRef"]));
   const [owner, name] = repo.nameWithOwner.split("/");
-  const defaultBranch = repo.defaultBranchRef?.name ?? "main";
   const fields = "number,state,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,headRefName,baseRefName,url,title,isDraft";
   const pr = JSON.parse(sh("gh", ["pr", "view", ...(prArg ? [prArg] : []), "--json", fields]));
   const paths = gatherPaths(pr.headRefName);
@@ -278,6 +287,7 @@ async function main(): Promise<void> {
   // Bot-approval gate. The required-bot list comes from the SAME .claude.git.config that
   // holds AFTER_MERGE_CMD (read once below). Only OPEN PRs are worth a GraphQL round.
   const { cfg } = readGitConfig(paths.mainClone);
+  const defaultBranch = resolveDefaultBranch(cfg, repo.defaultBranchRef?.name);
   const requiredBotReviewers = parseBotList(cfg.REQUIRED_BOT_REVIEWERS);
   const mergePolicy = parseMergePolicy(cfg.MERGE_POLICY);
   const mergeMethod = parseMergeMethod(cfg.MERGE_METHOD);

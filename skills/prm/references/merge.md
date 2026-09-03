@@ -154,7 +154,8 @@ Two non-negotiables: (a) every git op runs from the main clone via `git -C <main
    with `WS_NO_RUNTIME_META` (never instantiated) is a clean no-op. `devbox` missing
    from PATH → skip silently (a non-devbox Mac).
 5. `git -C <mainClone> fetch --prune` (always, after either path).
-6. **Pull the main clone — never switch it.** It is ALWAYS on the default branch (the
+6. **Pull the main clone — never switch it.** It is ALWAYS on the default branch — the
+   `DEFAULT_BRANCH` overlay when set, else GitHub's (the
    standing arrangement, not something to verify-then-correct): `status --porcelain`
    empty → `git -C <mainClone> pull --ff-only`; dirty → SKIP and warn. Not on the
    default branch → report and skip the pull, never correct it. Never `git switch`/
@@ -187,6 +188,12 @@ AFTER_MERGE_CMD=/wk:cleanup {slug} --remove --yes --delete-remote
 # Same tokens. Must be idempotent and cheap. Stops processes we own (dev servers,
 # bundlers, emulators) — never databases/containers, which stay warm.
 BEFORE_REVIEW_CMD=/wk:pause {slug}
+
+# The branch PRs land on and the seat the main clone sits on. Set it in the gitignored
+# .claude/.claude.git.config.local while one machine adopts an integration branch ahead of
+# the team (e.g. Acme's devlp, 2026-09); absent → GitHub's default branch.
+# Read by merge-precheck.ts, resolve-fetch.ts (prm) and sync-context.ts (/sync).
+DEFAULT_BRANCH=devlp
 
 # Only for machine-user bots (ordinary account/PAT, __typename == "User") that can't
 # be auto-detected. GitHub-App bots (__typename == "Bot") are auto-detected and

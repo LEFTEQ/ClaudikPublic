@@ -4,7 +4,9 @@ prm's create-or-find path. Idempotent: guarantees an open PR exists for
 the current branch and returns its URL + number. **Current-branch selector only** — an
 explicit `<N>` / URL / `latest by` selector with no PR stays a hard error.
 
-Inputs (optional): `--base <branch>` (default: the repo's default branch) ·
+Inputs (optional): `--base <branch>` (default: `defaultBranch` from `resolve-fetch.ts` — the
+`DEFAULT_BRANCH` overlay in `.claude/.claude.git.config.local` when the machine has one, else
+GitHub's default branch) ·
 `--draft` (explicit only) · `--title <text>` / `--body <text>` (either alone is fine).
 
 **Always author the body yourself** per `pr-body.md` (sibling file) —
