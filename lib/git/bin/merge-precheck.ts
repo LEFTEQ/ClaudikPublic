@@ -92,12 +92,25 @@ export function summarizeGates(g: GateInput): GateSummary {
 
 // --- Bot-approval gate (decision: hard gate, both flows) ---------------------
 // A "required bot" must approve before a PR is mergeable: it is approved when its LATEST
-// review is APPROVED. The required set = REQUIRED_BOT_REVIEWERS config (default
+// review is APPROVED (or an advisory COMMENTED verdict carrying an approval marker, see
+// isBotApprovalReview). The required set = REQUIRED_BOT_REVIEWERS config (default
 // review-bot[bot]) ∪ any auto-detected `[bot]` reviewer — but a bot only GATES when
 // it is actually on the PR (a requested reviewer, or it has submitted a review).
 // "if it is in the reviewers": a bot absent from the PR never blocks.
 
-export type LatestReview = { login: string; state: string };
+export type LatestReview = { login: string; state: string; body?: string };
+
+// eve's `verdictPosture: advisory` repos (e.g. AcmeBack) post EVERY verdict as a neutral
+// COMMENTED review; only the header carries the outcome. These are the two headers eve emits
+// for the verdicts that a gating repo would post as APPROVE (looks-good, and medium-only
+// "needs-changes" which APPROVEs with comments). "🔴 Changes requested" is deliberately absent.
+const ADVISORY_APPROVAL_MARKERS = ["eve review — ✅ Approved", "eve review — 🟡 Review comments"];
+
+export function isBotApprovalReview(review: LatestReview): boolean {
+  if (review.state === "APPROVED") return true;
+  if (review.state !== "COMMENTED" || !review.body) return false;
+  return ADVISORY_APPROVAL_MARKERS.some((m) => review.body!.includes(m));
+}
 
 export type BotApprovalInput = {
   configList: string[];          // REQUIRED_BOT_REVIEWERS, lowercased (parsed by parseBotList)
@@ -174,7 +187,7 @@ export function summarizeBotApproval(input: BotApprovalInput): BotApprovalSummar
   const pending: string[] = [];
   for (const bot of present) {
     const latest = input.latestReviews.find((r) => r.login === bot);
-    if (!latest || latest.state !== "APPROVED") pending.push(bot);
+    if (!latest || !isBotApprovalReview(latest)) pending.push(bot);
   }
   return { ok: pending.length === 0, required: [...present].sort(), pending: pending.sort() };
 }
@@ -221,7 +234,7 @@ query($owner:String!, $repo:String!, $pr:Int!) {
       reviewRequests(first:50) {
         nodes { requestedReviewer { __typename ... on User { login } ... on Bot { login } ... on Mannequin { login } } }
       }
-      latestReviews(first:50) { nodes { author { login __typename } state } }
+      latestReviews(first:50) { nodes { author { login __typename } state body } }
     }
   }
 }`;
@@ -237,7 +250,7 @@ function gatherBotData(owner: string, repo: string, pr: number): Omit<BotApprova
   }
   for (const n of node.latestReviews?.nodes ?? []) {
     const a = n.author;
-    if (a?.login) latestReviews.push({ login: canonicalizeBotLogin(String(a.login), a.__typename), state: String(n.state ?? "").toUpperCase() });
+    if (a?.login) latestReviews.push({ login: canonicalizeBotLogin(String(a.login), a.__typename), state: String(n.state ?? "").toUpperCase(), body: typeof n.body === "string" ? n.body : undefined });
   }
   return { requested, latestReviews };
 }

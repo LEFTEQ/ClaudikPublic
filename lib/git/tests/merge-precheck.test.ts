@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { summarizeChecks, summarizeGates, substituteHookTokens, summarizeBotApproval, parseBotList, canonicalizeBotLogin, parseMergePolicy, parseMergeMethod, resolveDefaultBranch } from "../bin/merge-precheck.ts";
+import { summarizeChecks, summarizeGates, substituteHookTokens, summarizeBotApproval, isBotApprovalReview, parseBotList, canonicalizeBotLogin, parseMergePolicy, parseMergeMethod, resolveDefaultBranch } from "../bin/merge-precheck.ts";
 import { parseConfig } from "../bin/sync-context.ts";
 
 test("no checks configured → NONE", () => {
@@ -131,6 +131,22 @@ test("a required bot reviewer must have a latest APPROVED review", () => {
   // APPROVED → ok
   const approved = summarizeBotApproval({ ...botBase, configList: cfg, latestReviews: [{ login: "review-bot", state: "APPROVED" }] });
   assert.equal(approved.ok, true);
+});
+
+test("an advisory COMMENTED eve verdict counts as approval only with an approval header", () => {
+  const login = "review-bot[bot]";
+  const cfg = ["review-bot[bot]"];
+  const review = (body: string, state = "COMMENTED") => summarizeBotApproval({ ...botBase, configList: cfg, latestReviews: [{ login, state, body }] });
+  // verdictPosture: advisory (AcmeBack) — looks-good and medium-only verdicts are approvals
+  assert.equal(review("## 🐉 eve review — ✅ Approved\n> `29b29e4` · 0 actionable findings").ok, true);
+  assert.equal(review("## 🐉 eve review — 🟡 Review comments\n> `abc1234` · 2 actionable findings").ok, true);
+  // a blocking verdict, a bodiless comment, or the in-progress status block never approve
+  assert.equal(review("## 🐉 eve review — 🔴 Changes requested\n> 1 blocking finding").ok, false);
+  assert.equal(review("").ok, false);
+  assert.equal(review("🐉 **eve review in progress — run 1**").ok, false);
+  // the marker never rescues a CHANGES_REQUESTED state
+  assert.equal(review("## 🐉 eve review — ✅ Approved", "CHANGES_REQUESTED").ok, false);
+  assert.equal(isBotApprovalReview({ login, state: "APPROVED" }), true);
 });
 
 test("review-bot only gates when it is on the PR ('if it is in the reviewers')", () => {

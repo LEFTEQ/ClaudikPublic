@@ -25,7 +25,7 @@ filtered, which threads count as self, when the teardown hook must emit nothing)
 | File | Covers |
 |---|---|
 | `resolve-fetch` | PR selector forms, bot filtering, self/resolved thread rules |
-| `merge-precheck` | required bot reviewers, login canonicalisation, worktree-teardown guard |
+| `merge-precheck` | required bot reviewers (incl. eve advisory COMMENTED verdicts), login canonicalisation, worktree-teardown guard |
 | `pr-events` · `github-io` | timeline shaping, flag parsing, API I/O edges |
 | `sync-context` | local-vs-remote DB url detection |
 | `classify-paths` · `tdd-classify` | commit bundling and TDD classification |
