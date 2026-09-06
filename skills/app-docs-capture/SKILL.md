@@ -14,7 +14,7 @@ Deliverable: screenshots safe to publish, pixel-stable, versioned, annotated in 
 - **Fixed viewport** (default 1440×900) for every shot in a set — annotation coordinates and visual consistency depend on it.
 - **Annotations live in code**: store the element's CSS-px rect next to the screenshot reference; render rings/badges as HTML overlays converted to %. Never draw into the image.
 - **Redact before anything ships**: personal emails, names, addresses, phone numbers, API keys/tokens. Company-owned public info (brand email) may stay.
-- **Verify every shot by Reading the image** after capture — right screen, right state, nothing sensitive. Non-delegable.
+- **Verify every shot by Reading the image** after capture — right screen, right state, nothing sensitive. Dense regions get cropped and enlarged (`sips` or the capture script) before judging; a full-frame glance misses small text. Non-delegable.
 - Capture scripts live in the repo (gitignored scratch dir, e.g. `.vitrinka/scratch/`), not /tmp — node module resolution needs the repo root.
 
 ## Asset format & structure (non-negotiable defaults)

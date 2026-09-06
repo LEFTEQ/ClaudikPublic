@@ -32,10 +32,15 @@ created: YYYY-MM-DD
 created-by: <this session's id>    # printenv CLAUDE_CODE_SESSION_ID
 sessions:                          # every session that wrote, enriched or drove it — creator first
   - <this session's id>
+feature: <project>/<epic id>        # vitrinka epic this work parents to; `none` for chores
 ---
 ```
 
 `memorylint` refuses a write that breaks this shape (the same hook that guards memory); `memorylint check ~/.claude/handoffs` audits the tree.
+
+## Ledger
+
+A `feature` epic gets the handoff attached and its state set in the same pass: `add_task_ref {kind: file, ref: <path>, meta: {kind: handoff, slug, status}}`, then `update_task {fields: {ledger_state, waiting_on?, next_action}}` — `waiting` (name what) when a prerequisite is unmet, else `scheduled`. Feature work with no epic yet: `create_task {type: epic}` first (contract: `~/.claude/docs/specs/2026-09-05-portfolio-ledger-decisions.md`).
 
 ## Runbook shape
 
@@ -45,7 +50,7 @@ Header (branch @ sha, tree state), then:
 - **Affected** — each app/repo with the key paths and what changes there.
 - **Prerequisites** — checkbox gates verified BEFORE phase 1, each with its verify command (`gh pr view N` merged, migration applied on dev, "confirm X still holds before implementing").
 - **Phases** — dependency-ordered; each states what to do and `Done when: <observable check>`. PRs go through /prm.
-- **Context** — decisions with their why, gotchas hit, facts not derivable from the repos. Secrets stay redacted (`<see onyx://…>`).
+- **Context** — preserve, exactly: problems hit and how they were resolved; options tried or set aside and why; everything decided, agreed, ruled out, or stated as a preference or constraint, in the user's own words; where things stand; what is still open or promised; hard-to-reconstruct specifics (names, numbers, exact wording, links). The session's own reasoning condenses to its conclusions. Secrets stay redacted (`<see onyx://…>`).
 - **Out of scope** — explicitly punted work the next session must not finish.
 
 Synthesize — never paste git diff/log output or transcript. ≤200 lines; a directory split beats padding.

@@ -1,6 +1,6 @@
 ---
 name: dev-env-troubleshooting
-description: "Use when a dev-environment command fails confusingly: EPERM on writes, unreadable cwd, a host unreachable from this Mac only, 127.0.0.1 works but localhost 404s, a wait loop that never exits, a CLI claiming a flag you passed is missing, or zsh mangling a variable. Read before hand-rolling any wait loop."
+description: "Use when a dev-environment command fails confusingly: EPERM on writes, unreadable cwd, a host unreachable from this Mac only, 127.0.0.1 works but localhost 404s, a wait loop that never exits, a CLI claiming a flag you passed is missing, or zsh mangling a variable, or a benign coding ask returns a refusal. Read before hand-rolling any wait loop."
 ---
 
 # Dev environment gotchas
@@ -268,3 +268,7 @@ the tunnel and black-holes at the WG gateway (`10.8.0.1`). The server is healthy
 
 **Fix:** toggle the VPN off, or reach the box over the WG mesh. **a jump-host ssh alias**
 in `~/.ssh/config` tunnels through the prod jump and works regardless of local VPN state.
+
+## A benign coding ask returns `stop_reason: "refusal"` — classifier false positive, not policy
+
+Fable-class models run safety classifiers; three shapes trip them on harmless work. Rephrase, don't escalate: ask "are there bugs in this program" instead of "does this compile without errors"; give a lesser-known language its docs or a one-line description before the task; keep base64 blobs out of tool output (strip or summarise them before they reach the model).

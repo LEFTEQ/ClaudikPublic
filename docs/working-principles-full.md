@@ -1,6 +1,6 @@
 # Working Principles (detail)
 
-Referenced from CLAUDE.md. Only non-default rules live here — general craft (think before coding, simplicity, surgical diffs, self-verification) is the model's default behavior and is deliberately not restated.
+Referenced from CLAUDE.md. Only rules the harness prompt does not already carry live here (think-first, verification, progress updates, finishing the task, scope of the deliverable are its job, not ours).
 
 ## Full Fixes, No Deferral
 

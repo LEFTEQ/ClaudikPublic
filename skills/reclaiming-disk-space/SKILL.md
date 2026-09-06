@@ -29,13 +29,12 @@ fast and costs an iCloud re-fetch to rebuild.
 
 | Mode | Invocation | What it does |
 |---|---|---|
-| **fast** | `bash fast.sh` | EMERGENCY. Deletes a frozen zero-risk set immediately — tool caches, DerivedData, brew, docker builder/image prune. No scans, no prompts, seconds to run. Use when the disk is critically full (hundreds of MB free). Never touches volumes, sims, or anything needing judgment. Then **reports, without deleting**, the two fixed paths that hold the biggest non-cache junk: abandoned screen recordings and oversized app-sandbox temp. |
+| **fast** | `reclaim` (the tools repo applet; `--until 100G`, `--tier N`, `--dry-run`, `--list`) | EMERGENCY. No scan, no prompt: a fixed ladder of regenerating caches deleted biggest-first, steps in a tier run concurrently, df printed after every step so wins land while slow steps (Docker prune) still run; `--until` stops as soon as enough is free. Tier 1 build/package caches (go-build, Docker build cache + images, bun, npm, DerivedData, gradle…) · 2 tool/app caches · 3 aggressive-but-reversible (DeviceSupport, device-less sim runtimes, aged Messages/sandbox tmp, Trash). Never volumes, containers, recordings. Ends with by-hand notes. Spec: `toolbox` `docs/reclaim.md`. |
 | **default** | `bash audit.sh` | The audit + confirm-then-delete workflow below. Adds a generic `>1G` giant-file sweep of `~/Library` (finds by size, not by name), screen-recording staging, app-sandbox temp over 1G, the Messages preview cache, and the top log dirs. Also reports device-less iOS runtimes (often 8GB each) and per-sim diagnostics-log stores (~2GB/sim, deletable keeping apps + data). |
 | **deep** | `bash audit.sh deep` | Default audit PLUS a **full `~/Library` pass** ranking every top-level tree (anything big with no row in the sections above is UNCLASSIFIED — drill in by hand); stale `~/Work/Projects` projects (no git activity for 7+ days — reports node_modules/.next/.turbo/dist/Pods/vendor/target sizes) and wt-* worktree volume classification (PR merged via `gh` → reclaimable; 7+ days idle → REVIEW-STALE). Thresholds: `STALE_DAYS`, `KEEP_DAYS` env. May take minutes. |
 
 When invoked with an argument (`/reclaiming-disk-space fast|deep`), run that mode.
-In fast mode, run `fast.sh` and report the before/after plus its NOT-DELETED block —
-that's the whole flow; the by-hand items there are usually the largest single wins.
+In fast mode, run `reclaim` (install: `toolbox install reclaim`; fallback `go run ./cmd/toolbox reclaim` from the toolbox checkout) and report its AFTER line plus the NOT DELETED block — that is the whole flow. Its `--dry-run` doubles as a sizing pass when the disk is not yet critical.
 Deep-mode staleness is a DOUBLE signal (last commit AND last working-tree change);
 `gh pr list --state merged --head <branch>` is the merge proof because squash-merged
 branches never show merged in local `git branch --merged`.
@@ -82,7 +81,7 @@ branches never show merged in local `git branch --merged`.
    quote a `du` figure as reclaimable space for a clone/hardlink-shared tree — confirm
    against `df` before offering it as an option.** Types to group by: sim runtimes, simulators,
    caches, Xcode build products, Docker images/build cache, Docker volumes, stale
-   project artifacts. fast.sh prints its own before/after df — that IS its summary.
+   project artifacts. `reclaim` prints its own BEFORE/AFTER df — that IS its summary.
 
 ## Quick Reference
 

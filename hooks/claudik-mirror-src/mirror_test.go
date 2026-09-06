@@ -131,3 +131,28 @@ func TestDenyFromStrings(t *testing.T) {
 		t.Error("dots must be escaped")
 	}
 }
+
+// A hook-exported GIT_DIR must not redirect the mirror's commits into the
+// private repo: git() has to act on cmd.Dir, whatever the hook environment says.
+func TestGitIgnoresHookGitDir(t *testing.T) {
+	private := t.TempDir()
+	target := t.TempDir()
+	for _, dir := range []string{private, target} {
+		if _, err := git(dir, "init", "-q", "-b", "main"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("GIT_DIR", filepath.Join(private, ".git"))
+	if err := os.WriteFile(filepath.Join(target, "README.md"), []byte("mirror\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := commitAll(target, "sync: test"); err != nil {
+		t.Fatal(err)
+	}
+	if got := gitShortSHA(private); got != "unknown" {
+		t.Errorf("private repo received the mirror commit: HEAD=%s", got)
+	}
+	if got := gitShortSHA(target); got == "unknown" {
+		t.Error("target repo has no commit")
+	}
+}

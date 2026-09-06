@@ -11,8 +11,9 @@ Distill `$ARGUMENTS` — a path, skill name, or command name — into its leanes
 Write for a very smart model. Per line: would it act differently without this line? No → delete.
 
 - Goal + constraints, not steps. Steps only where order genuinely matters or the operation is fragile (then exact commands, low freedom); high freedom everywhere else.
-- Never explain why an instruction exists, narrate hypotheticals ("if X, that would Y"), or restate default behavior — verification, self-correction, brevity, scope discipline, think-first are already the model's defaults and the harness's instructions.
+- Never explain why an instruction exists, narrate hypotheticals ("if X, that would Y"), or restate what the harness prompt already carries — think-first, verification, self-correction, progress updates, finishing the whole task, scope of the deliverable, writing style, tool-call batching. Not defaults, so one line is legitimate: surgical edits over whole-file rewrites, and test restraint (Fable 5.1 drifts toward both).
 - Never instruct the model to echo or explain its reasoning in output.
+- A behavior that resists a short rule gets ONE complete worked example (request, response, one-sentence rationale) instead of more rules. Explicit leave-out lists and keep lists ("don't fix X; report it" / "preserve exactly: …") are followed reliably — prefer them to prose.
 - Compression is token-measured, clarity-first: cut filler, hedging, duplicate statements of one rule. A symbol replaces words only when genuinely fewer tokens and unambiguous ("/" usually qualifies; "→" and invented abbreviations usually don't). Never drop a not/never/only/except. Never add words.
 - Consistent terminology throughout; no time-sensitive facts; references one level deep from SKILL.md; SKILL.md body < 500 lines.
 

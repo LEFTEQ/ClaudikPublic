@@ -79,6 +79,10 @@ merge with `--admin` — the normal completion, not an escalation: the server en
 the ruleset bypass identity; nothing is faked. Never for PRs authored by anyone else
 (human OR bot), a pending required-bot review, a BLOCK/stale audit, or red CI.
 
+## Feature closure (merged, before Teardown)
+
+Resolve the epic: the PR.s task ref (`vt-<id>` in branch or title → task → parent epic) or the branch handoff.s `feature:`. None → skip silently. Tick the gate matching the PR (`fields.gates[].done = true`, `evidence` = PR URL); every gate done → `ledger_state: closed`, otherwise `next_action` = first open gate and one `create_comment` listing what remains. Unanswered `decisions` items are the only escalation — name them in the hand-back. Contract: `~/.claude/docs/specs/2026-09-05-portfolio-ledger-decisions.md`.
+
 ## Teardown
 
 Two non-negotiables: (a) every git op runs from the main clone via `git -C <mainClone>`;

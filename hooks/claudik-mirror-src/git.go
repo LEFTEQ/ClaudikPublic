@@ -11,6 +11,7 @@ import (
 func git(dir string, args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
+	cmd.Env = withoutGitEnv(os.Environ())
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(out), fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(out)))
@@ -74,4 +75,20 @@ func commitAll(target, message string) error {
 func hasRemote(target string) bool {
 	out, err := git(target, "remote")
 	return err == nil && strings.TrimSpace(out) != ""
+}
+
+// withoutGitEnv drops the GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE family that git
+// exports into hook processes. Inherited, they pin every git call to the repo
+// running the hook, so a commit meant for the mirror lands on the private branch.
+func withoutGitEnv(env []string) []string {
+	kept := env[:0:0]
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "GIT_DIR=") || strings.HasPrefix(kv, "GIT_WORK_TREE=") ||
+			strings.HasPrefix(kv, "GIT_INDEX_FILE=") || strings.HasPrefix(kv, "GIT_PREFIX=") ||
+			strings.HasPrefix(kv, "GIT_COMMON_DIR=") || strings.HasPrefix(kv, "GIT_OBJECT_DIRECTORY=") {
+			continue
+		}
+		kept = append(kept, kv)
+	}
+	return kept
 }

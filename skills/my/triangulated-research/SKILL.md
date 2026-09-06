@@ -5,7 +5,7 @@ description: "Research-first answering via `$triangulated-research` or `/researc
 
 # research — Research-first answering
 
-Hard stop before answering: gather current evidence from multiple source classes, run a contrarian check, *then* answer. Output serves either the user ("teach me X") or the AI itself (recommendations must come from fresh sources, not memory).
+Hard stop before answering: gather current evidence from multiple source classes, run a contrarian check, *then* answer. Output serves either the user ("teach me X") or the AI itself (recommendations must come from fresh sources, not memory). Recognising a name is not knowing its current state — search every named tool, model, or library as the user wrote it, in at least one query, however familiar it feels.
 
 ## When NOT to use this skill
 
@@ -62,7 +62,7 @@ Internal synthesis (not shown to user yet):
 - **Project-specific:** what changes given the user's actual code / conventions?
 - **Recommendation seed:** one-line answer grounded in the user's stack
 
-Unresolved contradictions get surfaced in the output, not hidden.
+Unresolved contradictions get surfaced in the output, not hidden. Sources are conveyed in your own indirect speech; a phrase reproduced from a source is short and marked as a quotation.
 
 ### Phase 4: Deliver
 
