@@ -18,7 +18,7 @@ import (
 	"os"
 )
 
-const version = "1.1.0"
+const version = "1.2.0"
 
 func usage() {
 	fmt.Fprintln(os.Stderr, `claude-guards — fast PreToolUse guard hooks for Claude Code
@@ -28,6 +28,8 @@ Usage:
   claude-guards read                          PreToolUse:Read — block raw .e2e PNG reads
   claude-guards refresh-visibility <dir> <cache-file>
                                               internal: background repo-visibility refresh
+  claude-guards swarm-teardown [--dead-only]  SessionEnd: kill this session's swarm tmux server + sweep dead ones;
+                                              --dead-only (SessionStart, manual runs): sweep dead leaders only
   claude-guards version`)
 }
 
@@ -62,6 +64,8 @@ func main() {
 		if len(args) == 3 {
 			refreshVisibility(args[1], args[2])
 		}
+	case "swarm-teardown":
+		swarmTeardown(len(args) > 1 && args[1] == "--dead-only")
 	default:
 		usage()
 		os.Exit(2)

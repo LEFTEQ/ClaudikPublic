@@ -216,6 +216,55 @@ newline-separated list needs `${(f)"$(cmd)"}` or a `while read` loop.
 💡 `~/.claude/lib/git/bin/github-io.ts` now detects a whitespace-bearing
 flag name and names this cause outright instead of blaming a missing field.
 
+## `xcodebuild` hangs at `CreateBuildDescription` — a stale WDA build, not your code
+
+**Symptom:** `xcodebuild` produces a few lines, reaches
+`GatherProvisioningInputs` → `CreateBuildDescription` → an
+`ExecuteExternalTool … clang -v -E -dM` / `swiftc --version` line, and then
+never writes another byte. No compiler processes appear. Killing and re-running
+stalls at the identical line (observed 2026-09-08, pultik).
+
+**The tell that it is NOT your project:** run those probe commands yourself —
+
+```sh
+timeout 5 $(xcrun -f swiftc) --version
+timeout 10 $(xcrun -f clang) -v -E -dM -isysroot "$(xcrun --show-sdk-path --sdk macosx)" -x c -c /dev/null
+```
+
+Both return instantly. The toolchain is healthy; `SWBBuildService` is wedged.
+`swiftc -typecheck` on the sources also still works, which is a useful way to
+keep verifying while the build is stuck.
+
+**Cause:** an abandoned long-lived `xcodebuild` holding the shared build
+service. The repeat offender is Appium's WebDriverAgent
+(`xcodebuild build-for-testing test-without-building … WebDriverAgent.xcodeproj`)
+left behind by a dead test run — a WDA build takes minutes, so anything hours
+old is an orphan.
+
+**Diagnose, oldest first** (`etime`, not PID order):
+
+```sh
+ps -eo pid,etime,args | grep "[x]codebuild"
+```
+
+**Fix:** kill the orphan by PID. That alone unwedged it; the next `xcodebuild`
+ran normally and Appium rebuilds WDA on its next use.
+
+🚨 **Scope the kill to the orphan.** A blanket `pkill -f SWBBuildService` also
+kills the build service of every OTHER live Xcode build on the machine —
+parallel sessions' builds die as collateral. Kill the specific stale PID.
+
+⚠️ **Two false signals to avoid while diagnosing this:**
+- `xcodebuild … | tail -N` buffers everything until exit, so the log looks empty
+  and the build looks hung even when it is fine. Redirect to a file instead.
+- `until ! pgrep -f "xcodebuild.*MyApp"` never exits — the loop's own command
+  line contains the pattern (see the `pgrep -f` self-match entry above).
+
+**After adding a test file, regenerate before trusting a pass.** With a
+Tuist/XcodeGen project, `-only-testing:Target/NewTests` against a project
+generated BEFORE the file existed prints `** TEST SUCCEEDED **` and
+`Executed 0 tests`. Always read the executed count, never the banner.
+
 ## Prefer `127.0.0.1` over `localhost` in env URLs
 
 `localhost` resolves to IPv6 `::1` on macOS, while many dev servers (Node,

@@ -74,7 +74,7 @@ Sweep the diff before writing the two action sections (same irreversibles lens a
 
 Before writing, `list_boards` scoped to this repo/branch (and the `pr-<N>-<repo>` slug
 when the PR exists). Every board tied to this work lands in the body by its
-server-returned `shortUrl`: design/spec/brainstorming boards under `## Why`;
+server-returned `url`: design/spec/brainstorming boards under `## Why`;
 testing sets, journeys, recorded sessions and review boards under `## Verification`.
 No board exists → link nothing (no placeholder line) and never `create_board` for the
 body's sake. When a board appears later in the PR's life, the upkeep rewrite adds it.

@@ -48,6 +48,20 @@ Messages: `type(scope): subject` — `feat`/`fix`/`chore`/`docs`/`refactor`/`tes
 trailing period; body only when the WHY isn't obvious. Match the change's actual
 shape (`fix:` for a bug fix, `refactor:` for a pure restructure).
 
+**Task trailer (vitrinka).** In a repo onboarded with `vitrinka project
+setup`, a `prepare-commit-msg` hook appends `Vitrinka-Task: vt-<id>` to
+every commit on a branch (or `.worktrees/` path) carrying `vt-<id>`; the
+subject prefix (`[vt-401] …` / `vt-401 …` / `vt-401: …`) appears only
+when the project turned it on (`vitrinka project commits --subject on`;
+style is workspace-wide: `vitrinka workspace commit-prefix <style>`).
+Never write the trailer or the prefix by hand — the hook adds them, and it
+never rewrites a trailer a human already wrote. When a commit must name a
+DIFFERENT task than the branch, write that trailer yourself
+(`Vitrinka-Task: vt-<other>`) and the hook leaves it alone. Merge, squash,
+`fixup!` and `squash!` messages are never touched. The GitHub App's `push`
+event turns the trailer into a `commit` ref on the task; nothing else is
+needed to link a commit.
+
 Commit serially: `git add <explicit-paths>` per bundle, then commit via HEREDOC:
 
 ```bash

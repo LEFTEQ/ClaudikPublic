@@ -12,7 +12,7 @@ Every discrete-vocabulary widget gets an auto-appended 'Other / Něco jiného' o
 
 ## Reuse & Errors
 
-- **DRY at 3+ implementations.** Three similar implementations mean a missed abstraction — extract on concrete duplication, never speculatively for single-use code. Document new shared code (location, purpose, usage) in the project CLAUDE.md immediately so future sessions reuse instead of duplicating.
+- **DRY at 3+ implementations.** Three similar implementations mean a missed abstraction — extract on concrete duplication, never speculatively for single-use code. Shared code earns reuse by being discoverable where it lives (naming, a package doc comment or README beside it). CLAUDE.md is operating rules — traps, contracts, conventions — never a feature ledger; what shipped and what a subsystem is are derivable from code and git. A `<repo>/.claude/memory/` project note is the home only when a fresh session would otherwise duplicate the code.
 - **Never silently swallow errors.** No bare `catch {}` / `.catch(() => undefined)`. Narrow every catch to the genuinely-expected case (ENOENT = "not there yet", malformed-JSON = recoverable-empty); log and rethrow the unexpected (EACCES/EIO/network/timeout). Map transport failures to typed exceptions (e.g. NestJS `BadGatewayException` → 502) AND log the cause — errors must never become opaque 500s. Heuristic for any catch: "what does this hide, and would an operator see a log if it fired?"
 
 Related: `~/.claude/docs/orchestration-full.md`, `~/.claude/docs/git-safety-full.md`.

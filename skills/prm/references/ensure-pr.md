@@ -43,3 +43,11 @@ Steps:
      reaching it means step 0 was skipped — a bug, not an outcome. "No commits between
      <base> and <branch>" → **STOP** and say so. Print the URL per `output.md`; return
      URL + number.
+4. **Attach the PR to its task (vitrinka, run publish 2026-09-09 D10).** When the
+   branch or title carries `vt-<id>` and the repo has a vitrinka binding
+   (`.vitrinka/project.json`): `add_task_ref {id: <id>, kind: "pr", ref:
+   "<owner/repo>#<N>", meta: {title, url}}` on the task AND, when the task
+   climbs to an `epic`, the same ref on the epic — the epic's rollup ("last run …
+   · PR #N"), the final artifact's § Delivery and the run door all read `pr`
+   refs. Re-attaching the same (kind, ref) only updates meta, so re-running is
+   safe. No `vt-<id>` or no binding → skip silently, never ask.

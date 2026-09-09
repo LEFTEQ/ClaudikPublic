@@ -83,6 +83,34 @@ the ruleset bypass identity; nothing is faked. Never for PRs authored by anyone 
 
 Resolve the epic: the PR.s task ref (`vt-<id>` in branch or title → task → parent epic) or the branch handoff.s `feature:`. None → skip silently. Tick the gate matching the PR (`fields.gates[].done = true`, `evidence` = PR URL); every gate done → `ledger_state: closed`, otherwise `next_action` = first open gate and one `create_comment` listing what remains. Unanswered `decisions` items are the only escalation — name them in the hand-back. Contract: `~/.claude/docs/specs/2026-09-05-portfolio-ledger-decisions.md`.
 
+## QA plan (vitrinka, feature lifecycle D6 — merged, after Feature closure)
+
+When the branch carried `vt-<id>` (or the user named a task) and the repo has a
+vitrinka binding (`.vitrinka/project.json` or `vitrinka project setup` was run):
+
+1. Resolve the epic: `vitrinka task get <id> --json` — a `task`/`story` climbs
+   `parentId` until it reaches the `epic`; no epic → skip and say
+   "no epic — QA plan not filed".
+2. When the epic already has an OPEN `qa` child
+   (`vitrinka task resolve-qa --task <epic> --json` exits 0), the plan exists:
+   add this PR's touched journeys to it (tasks skill → "Journeys"); never file
+   a second qa task.
+3. Otherwise follow the tasks skill's **"QA plan"** recipe: ONE
+   `propose_tasks {project, source: {kind: "qa-plan", ref: "<owner/repo#n>"},
+   drafts: [...]}` call — the `qa` draft carries `key: "plan"`, `type: "qa"`,
+   `parentId: <epicId>`, `fields: {scope, roles}`; every journey draft carries
+   `parentKey: "plan"`, `type: "journey"`, `fields: {key, role, route,
+   steps: [{name}], expected, test}`, one per user-visible path from the
+   decision log (`docs/specs/*-decisions.md` on the branch), the merged diff
+   and the e2e specs the PR added or changed. `parentId` is always a task id
+   (live or pending), never a position. Accepting a journey accepts its
+   pending qa draft first; declining the qa draft declines its journeys. Eve
+   refines the drafts when a backend is configured (fail-open); a human
+   accepts them from the intake queue.
+4. Print the qa task's short URL as `🧪 QA plan: <shortUrl> — ⏸️ waiting on
+   intake accept` in the hand-back. Do not compose the qa board yourself —
+   `qa_board` runs after the plan is accepted (tasks skill → "Journeys").
+
 ## Teardown
 
 Two non-negotiables: (a) every git op runs from the main clone via `git -C <mainClone>`;
