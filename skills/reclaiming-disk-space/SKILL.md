@@ -34,7 +34,21 @@ fast and costs an iCloud re-fetch to rebuild.
 | **deep** | `bash audit.sh deep` | Default audit PLUS a **full `~/Library` pass** ranking every top-level tree (anything big with no row in the sections above is UNCLASSIFIED — drill in by hand); stale `~/Work/Projects` projects (no git activity for 7+ days — reports node_modules/.next/.turbo/dist/Pods/vendor/target sizes) and wt-* worktree volume classification (PR merged via `gh` → reclaimable; 7+ days idle → REVIEW-STALE). Thresholds: `STALE_DAYS`, `KEEP_DAYS` env. May take minutes. |
 
 When invoked with an argument (`/reclaiming-disk-space fast|deep`), run that mode.
-In fast mode, run `reclaim` (install: `toolbox install reclaim`; fallback `go run ./cmd/toolbox reclaim` from the toolbox checkout) and report its AFTER line plus the NOT DELETED block — that is the whole flow. Its `--dry-run` doubles as a sizing pass when the disk is not yet critical.
+In fast mode, run `reclaim` (install: `go build -o ~/.local/share/toolbox/bin/toolbox-dev ./cmd/toolbox` from the toolbox checkout — `~/.local/bin/reclaim` is a symlink to that dev binary; `toolbox install reclaim` is not a catalog item) and report its AFTER line plus the NOT DELETED block — that is the whole flow. Its `--dry-run` doubles as a sizing pass when the disk is not yet critical.
+
+**Fast mode is a long-running, streaming command — launch it so the progress is visible:**
+`reclaim` prints one line per finished step (`[tier] title  size  seconds  free <df>`) as it
+goes, and a Docker prune step can take minutes. Piping it through `tail`/`head`/`$(…)`
+buffers everything until exit, so the user stares at a blank terminal. Run it detached
+into a log and relay the lines as they land:
+
+```bash
+reclaim > /tmp/reclaim.log 2>&1        # run_in_background: true
+tail -n 20 /tmp/reclaim.log            # poll (Monitor / background notification), paste new step lines to the user
+```
+
+Post a one-line update per tier (biggest wins so far + current free), never a silent wait
+until AFTER. `--dry-run` is fast enough to run in the foreground.
 Deep-mode staleness is a DOUBLE signal (last commit AND last working-tree change);
 `gh pr list --state merged --head <branch>` is the merge proof because squash-merged
 branches never show merged in local `git branch --merged`.
