@@ -40,7 +40,7 @@ feature: <project>/<epic id>        # vitrinka epic this work parents to; `none`
 
 ## Ledger
 
-A `feature` epic gets the handoff attached and its state set in the same pass: `add_task_ref {kind: file, ref: <path>, meta: {kind: handoff, slug, status}}`, then `update_task {fields: {ledger_state, waiting_on?, next_action}}` — `waiting` (name what) when a prerequisite is unmet, else `scheduled`. Feature work with no epic yet: `create_task {type: epic}` first (contract: `~/.claude/docs/specs/2026-09-05-portfolio-ledger-decisions.md`).
+A feature epic is handed back through `/vitrinka:handoff` (`hand_back`); the file runbook is written only for chores and repos without vitrinka. Otherwise a `feature` epic gets the handoff attached and its state set in the same pass: `add_task_ref {kind: file, ref: <path>, meta: {kind: handoff, slug, status}}`, then `update_task {fields: {ledger_state, waiting_on?, next_action}}` — `waiting` (name what) when a prerequisite is unmet, else `scheduled`. Feature work with no epic yet: `create_task {type: epic}` first (contract: `~/.claude/docs/specs/2026-09-05-portfolio-ledger-decisions.md`).
 
 ## Runbook shape
 

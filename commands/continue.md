@@ -3,6 +3,8 @@ description: Resume a /handoff — load the named handoff and drive its workflow
 argument-hint: <handoff-name>
 ---
 
+A vitrinka task URL or id as `<name>` → `/vitrinka:pickup <id|url>` (pickup + claim); the file form below stays for chores and repos without vitrinka.
+
 Resolve $ARGUMENTS against `~/.claude/handoffs/*/<name>` (`.md` file or directory; `archive/` is out of scope). Empty → list the current project's live handoffs newest-first and ask; a name matching several projects → the current repo's wins.
 
 Read the whole handoff (directory → `handoff.md` first, then its context files), then:

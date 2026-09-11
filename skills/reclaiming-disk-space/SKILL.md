@@ -34,28 +34,50 @@ fast and costs an iCloud re-fetch to rebuild.
 | **deep** | `bash audit.sh deep` | Default audit PLUS a **full `~/Library` pass** ranking every top-level tree (anything big with no row in the sections above is UNCLASSIFIED — drill in by hand); stale `~/Work/Projects` projects (no git activity for 7+ days — reports node_modules/.next/.turbo/dist/Pods/vendor/target sizes) and wt-* worktree volume classification (PR merged via `gh` → reclaimable; 7+ days idle → REVIEW-STALE). Thresholds: `STALE_DAYS`, `KEEP_DAYS` env. May take minutes. |
 
 When invoked with an argument (`/reclaiming-disk-space fast|deep`), run that mode.
-In fast mode, run `reclaim` (install: `go build -o ~/.local/share/toolbox/bin/toolbox-dev ./cmd/toolbox` from the toolbox checkout — `~/.local/bin/reclaim` is a symlink to that dev binary; `toolbox install reclaim` is not a catalog item) and report its AFTER line plus the NOT DELETED block — that is the whole flow. Its `--dry-run` doubles as a sizing pass when the disk is not yet critical.
+In fast mode, run `reclaim` (install: `go build -o ~/.local/share/toolbox/bin/toolbox-dev ./cmd/toolbox` from the toolbox checkout — `~/.local/bin/reclaim` is a symlink to that dev binary; `toolbox install reclaim` is not a catalog item) and report its AFTER line plus the NOT DELETED block — that is the whole flow, streamed per "Stream every mode" below. Its `--dry-run` doubles as a sizing pass when the disk is not yet critical.
 
-**Fast mode is a long-running, streaming command — launch it so the progress is visible:**
-`reclaim` prints one line per finished step (`[tier] title  size  seconds  free <df>`) as it
-goes, and a Docker prune step can take minutes. Piping it through `tail`/`head`/`$(…)`
-buffers everything until exit, so the user stares at a blank terminal. Run it detached
-into a log and relay the lines as they land:
-
-```bash
-reclaim > /tmp/reclaim.log 2>&1        # run_in_background: true
-tail -n 20 /tmp/reclaim.log            # poll (Monitor / background notification), paste new step lines to the user
-```
-
-Post a one-line update per tier (biggest wins so far + current free), never a silent wait
-until AFTER. `--dry-run` is fast enough to run in the foreground.
 Deep-mode staleness is a DOUBLE signal (last commit AND last working-tree change);
 `gh pr list --state merged --head <branch>` is the merge proof because squash-merged
 branches never show merged in local `git branch --merged`.
 
+## Stream every mode — a silent wait is a bug in how you launched it
+
+**Every mode here runs for minutes and prints progressively; none of them should be
+launched in a way that hides that.** `reclaim` emits one line per finished step
+(`[tier] title  size  seconds  free <df>`), `audit.sh` emits one section at a time —
+but a foreground Bash call shows nothing until the process exits, and piping through
+`tail`/`head`/`$(…)` buffers it even then. The user sits watching a blank terminal
+while a Docker prune or a `find ~/Library` sweep grinds. Never do that to them.
+
+Launch detached into a log, arm a filter, relay lines as they land:
+
+```bash
+reclaim > /tmp/reclaim.log 2>&1                  # run_in_background: true
+bash audit.sh deep > /tmp/reclaim-audit.log 2>&1 # same, per mode
+```
+
+Then watch it with the native `Monitor` tool (`persistent: false`, each stdout line
+becomes a notification) — NOT a polling loop:
+
+| Mode | Monitor command |
+|---|---|
+| fast | `tail -f /tmp/reclaim.log \| grep -E --line-buffered '^\[\|AFTER\|FAILED\|target \|NOT DELETED'` |
+| default / deep | `tail -f /tmp/reclaim-audit.log \| grep -E --line-buffered 'DISK\|OFFENDERS\|CACHES\|GIANT\|STAGING\|DOCKER\|SIM \|DEEP —\|SUGGESTED\|ORPHAN\|MOVED\|REVIEW\|DB!'` |
+
+The verdict tokens belong in the audit filter: the section headers prove it is alive,
+the `ORPHAN`/`MOVED`/`REVIEW`/`DB!` lines are the payload you are waiting for.
+
+`--line-buffered` on every `grep` stage is load-bearing; `head` cannot flush at all, so
+never put one in the pipeline. Relay a one-line update per tier (fast) or per section
+(default/deep) — biggest wins so far plus current free — so the wait is legible instead
+of blank. `reclaim --dry-run` and a `--only <step>` run are quick enough for the
+foreground.
+
 ## Workflow (default + deep)
 
-1. **Audit (read-only).** Run the bundled script — it deletes nothing, just reports:
+1. **Audit (read-only).** Run the bundled script — it deletes nothing, just reports.
+   Launch it detached and stream it per the section above (the `>1G` sweep and the deep
+   `~/Library` pass each take minutes of silence otherwise):
    ```bash
    bash ~/.claude/skills/reclaiming-disk-space/audit.sh        # or: audit.sh deep
    ```
@@ -138,6 +160,7 @@ means "confirm by hand", never "auto-delete" (trivial 0B ones are suppressed).
 
 | Mistake | Reality / Fix |
 |---|---|
+| Running any mode in the foreground, or through `\| tail` | Both hide every progress line until exit — two blank minutes on `reclaim`, more on `audit.sh deep`. The user asked for progress, not a verdict. Detach into a log + `Monitor`. |
 | Auditing only the named dev-tool buckets | 82G of abandoned screen recordings and 22G of Messages sandbox temp scored **zero rows**. Rank generically by size first, classify second. |
 | Summing `Group Containers` **and** `GroupContainersAlias` | The Alias is a symlink to the same tree — double-counts 100G+. Enumerate with `find ~/Library -maxdepth 1 -type d`. |
 | `rm -rf ~/Library/Messages/*` to clear its 22G | `Attachments/` **is** the conversation media. Only `Caches/Previews` and the sandbox tmp regenerate. |
