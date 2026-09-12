@@ -1,6 +1,6 @@
 ---
 disable-model-invocation: true
-argument-hint: [slug] [workflow] [auto]
+argument-hint: "[slug] [workflow] [auto]"
 ---
 
 # /handoff — Executable Session Handoff

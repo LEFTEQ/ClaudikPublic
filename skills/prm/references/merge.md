@@ -127,8 +127,9 @@ Two non-negotiables: (a) every git op runs from the main clone via `git -C <main
    (the cwd-holders are our own `claude`, its MCP servers and shells, nothing else):
    - **Entered via `EnterWorktree`** → after the dev-server kill + scoped Docker
      teardown, call `ExitWorktree(action: "remove")` INSTEAD of `cd` + `worktree
-     remove` + `branch -d`. The clean gate already passed, so `discard_changes` must
-     not be needed; if the tool refuses and lists changes, STOP and report — never
+     remove` (step 5 still deletes the branch, after the exit). The clean gate already
+     passed, so `discard_changes` must not be needed; if the tool refuses and lists
+     changes, STOP and report — never
      pass `discard_changes: true` on your own initiative.
    - **Launched inside the worktree** (no `EnterWorktree` this session) → ONE one-shot
      Bash call:
@@ -168,8 +169,7 @@ Two non-negotiables: (a) every git op runs from the main clone via `git -C <main
    Then `git -C <mainClone> worktree remove <worktree>` (clean by gate; no `--force` —
    acceptable ONLY after an interrupted previous attempt, because the clean gate had
    passed). Removal is SLOW on bootstrapped worktrees (`node_modules`) — generous
-   timeout; 30–60s is NOT failure. Then `git -C <mainClone> branch -d <branch>`
-   (ignore "not found"). Then scoped Docker teardown per mapped project `P`:
+   timeout; 30–60s is NOT failure. Then scoped Docker teardown per mapped project `P`:
    - `P` starts with `wt-` → `docker compose -p "$P" down -v --remove-orphans` —
      re-verify the `wt-` prefix on `P` AND on each volume's
      `com.docker.compose.project` label immediately before removal; REFUSE any volume
@@ -185,7 +185,16 @@ Two non-negotiables: (a) every git op runs from the main clone via `git -C <main
    diagnostic's `fix` line, never retry, never `devbox down` on your own; `ok:true`
    with `WS_NO_RUNTIME_META` (never instantiated) is a clean no-op. `devbox` missing
    from PATH → skip silently (a non-devbox Mac).
-5. `git -C <mainClone> fetch --prune` (always, after either path).
+5. **Delete the local branch, then prune** — always, after EVERY path: `ExitWorktree`
+   and an `AFTER_MERGE_CMD` hook may or may not have deleted it, and a merged branch
+   never survives the session. `git -C <mainClone> branch -d <branch>`; "not found"
+   means done. `error: … not fully merged` is the NORMAL outcome of a squash/rebase
+   merge or a main clone not yet pulled, never a reason to leave the branch: the merge
+   is confirmed and `git -C <mainClone> rev-parse <branch>` equals the PR's `headSha`
+   → the tip is provably in the PR → `git -C <mainClone> branch -D <branch>`. A tip
+   that is NOT the merged `headSha` (commits never pushed into the PR) → KEEP it and
+   report. Then `git -C <mainClone> fetch --prune`, and verify: `git -C <mainClone>
+   branch --list <branch>` prints nothing.
 6. **Pull the main clone — never switch it.** It is ALWAYS on the default branch — the
    `DEFAULT_BRANCH` overlay when set, else GitHub's (the
    standing arrangement, not something to verify-then-correct): `status --porcelain`

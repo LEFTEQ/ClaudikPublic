@@ -162,7 +162,9 @@ the batch and is reported, never acted on with older evidence.
 4. **Worktree:** `git worktree remove <path>` with a generous timeout — deleting
    `node_modules` takes minutes; slow ≠ failed. Stray dirs: `rm -rf` (git refuses
    paths it doesn't track).
-5. **Local branch:** `git branch -d` only. Refusal → report verbatim, never `-D`.
+5. **Local branch:** `git branch -d`. A `DELETABLE (squash)` branch always refuses it —
+   §1 already proved the patch landed, so that class alone earns `git branch -D`. Any
+   other refusal → report verbatim, never `-D`.
 6. **Remote branch — EVERY remote carrying it, not just `origin`** (FixIt also has
    `devbox`, the `/rt` bare cache — deleting only from `origin` leaves the copy
    pinned forever and §1's `git branch -r` keeps listing it). Only branches the audit
