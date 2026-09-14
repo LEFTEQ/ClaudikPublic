@@ -271,6 +271,16 @@ test("MERGE_METHOD: absent → merge; squash → squash; a typo falls back to me
   assert.deepEqual(parseMergeMethod("fast-forward"), { method: "merge", invalid: "fast-forward" });
 });
 
+test("MERGE_METHOD: what the repository allows overrides an unset or refused method", () => {
+  const squashOnly = { merge: false, squash: true, rebase: false };
+  // A squash-only repository needs no config — the old "merge" default was a server refusal.
+  assert.deepEqual(parseMergeMethod(undefined, squashOnly), { method: "squash", invalid: null });
+  // An explicit method the repository has disabled is drift: fall back, echo it.
+  assert.deepEqual(parseMergeMethod("merge", squashOnly), { method: "squash", invalid: "merge" });
+  // Where merge is still offered, the historical default stands.
+  assert.deepEqual(parseMergeMethod(undefined, { merge: true, squash: true, rebase: true }), { method: "merge", invalid: null });
+});
+
 test("MERGE_POLICY: absent → review; self → self; a typo falls back to review and is echoed", () => {
   assert.deepEqual(parseMergePolicy(undefined), { policy: "review", invalid: null });
   assert.deepEqual(parseMergePolicy(" Self "), { policy: "self", invalid: null });

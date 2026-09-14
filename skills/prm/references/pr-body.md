@@ -2,139 +2,133 @@
 
 Every PR prm opens **or watches** carries a body written to this contract.
 
-Write for a reader with **zero context** — the repo owner months later, deciding *"is
-this still worth merging, and what does merging it cost me?"*. They need: what problem
-this solves → what it does → what they must do around the merge. Never a file-by-file
-inventory (the Files tab is one).
+Reader: the repo owner months later with zero context, deciding *"is this still worth
+merging, and what does merging it cost me?"*. Short and dense: every sentence carries a
+fact — a behaviour, a decision, a name, a number — and a sentence that states nothing
+new is cut. No narrative, no file inventory (the Files tab is one), nothing that needs
+the diff open to parse. Whole body ≤ ~150 words above the links table.
 
 ## Anti-patterns
 
 | ✗ Don't | ✓ Do |
 |---|---|
-| Open with a bullet per changed file | Open with the problem in plain prose |
-| `--fill` / a pasted commit log | A written *why*, then a written *what* |
-| Internal shorthand as load-bearing text (`Implements D2/D3`) | Say the thing; cite the spec/board as a link |
+| A bullet per changed file, `--fill`, a pasted commit log | Why → approach → intent, a few dense sentences each |
+| Connective prose ("In order to…", "This means that…") | Fact-only sentences |
 | Describe the code (`adds enhanceSnippet()`) | Describe the behaviour the user gets |
-| Silence on migrations / env vars / flags | An explicit section, `None.` when empty |
-
-Jargon test: a sentence that needs the diff open to parse is implementation detail —
-move it below the fold or cut it.
+| Internal shorthand as load-bearing text (`Implements D2/D3`) | Say the thing; the spec is a row in the links table |
+| Links scattered through sections | One links table, identical rows in every PR |
+| Silence on migrations / env vars / flags | One `Blockers & risks` bullet each, `None.` when empty |
 
 ## Required shape
 
 ```markdown
-<One or two sentences: what this PR is for, in plain language.>
+## Why this exists
+<1–3 sentences: what is wrong today, what stays broken if this never merges.>
 
-## Why
+## Approach
+<2–4 sentences: how it was solved, what was deliberately not done and why.>
 
-The problem, bug, or goal — what is wrong today, what stays broken if this never
-merges. Link the issue/spec/board here.
+## Intent
+<1–2 sentences: the outcome merging should produce — what to judge this PR against.>
 
-## What changes
-
-Behaviour, from the outside in — grouped by user-visible surface, not by file. Two to
-six bullets. Call out changed existing behaviour vs new behaviour.
-
-## Before merging
-
-Anything that must happen FIRST, or `None.`
-
-## After merging
-
-Anything the merge does not do by itself, or `Nothing required.`
+## Blockers & risks
+<one bullet per item, tagged `before:` (must happen first) or `after:` (the merge does
+not do it itself), naming the exact command / key / file — or `None.`>
 
 ## Verification
+<1–3 sentences: what was proven and how; what was NOT covered.>
 
-How this was actually proven — tests, hands-on QA with the vitrinka board(s) linked.
-Be honest about what was NOT covered.
+## Links
+| | |
+|---|---|
+| Task | <url> |
+| Epic | <url> |
+| Spec / design | <url · url> |
+| QA / testing | <url · url> |
+| Review | <url> |
+| Opened by session | `<CLAUDE_CODE_SESSION_ID>` |
 ```
 
-`## Before merging` and `## After merging` are **never omitted** — an explicit `None.`
-tells the reader the question was asked. An optional `<details>` block with
-implementation notes may follow, never precede, these sections.
+Sections and table rows are **never omitted** — `None.` / `—` tells the reader the
+question was asked. Rows: Task = the bound vitrinka task; Epic = its parent epic;
+Spec / design = brainstorming, decision-log and design boards; QA / testing = testing
+sets, journeys, recorded sessions; Review = the `pr-<N>-<repo>` board and Eve review
+boards; Opened by session = `printenv CLAUDE_CODE_SESSION_ID` at create time, never
+changed by later rounds. Every URL is the server-returned `url`, full, never shortened.
+An optional `<details>` implementation-notes block may follow the table, never precede it.
 
-## The action-item lens
+## The blockers lens
 
-Sweep the diff before writing the two action sections (same irreversibles lens as
+Sweep the diff before writing `Blockers & risks` (same irreversibles lens as
 `auto-audit.md` §4, asking *"what must a human DO about it?"*):
 
-| Category | Look for | Lands in |
+| Category | Look for | Tag |
 |---|---|---|
-| **Env vars / secrets** | New/renamed keys, changed defaults, new required credential | Before |
-| **DB migrations** | Migration files, DDL, index builds | After — plus backup reminder when destructive |
-| **Client data** | Backfills, repair scripts, re-indexing, cache invalidation | After, with the exact command |
-| **Feature flags** | A flag this PR reads or flips | Before (create) / After (flip) |
-| **Config & infra** | compose, nginx, Dockerfile, CI, cron | Whichever applies; name the file |
-| **Deployed clients** | API/shape change a mobile app or other service consumes | Before — the consumer ships first |
-| **Package publish** | Version bump needing `npm publish` / a tag | After |
-| **Merge order** | A PR that must land first, a stacked branch | Before, linked |
-| **Manual verification** | Something only a human on prod can confirm | After |
-
-## The vitrinka-links sweep
-
-Before writing, `list_boards` scoped to this repo/branch (and the `pr-<N>-<repo>` slug
-when the PR exists). Every board tied to this work lands in the body by its
-server-returned `url`: design/spec/brainstorming boards under `## Why`;
-testing sets, journeys, recorded sessions and review boards under `## Verification`.
-No board exists → link nothing (no placeholder line) and never `create_board` for the
-body's sake. When a board appears later in the PR's life, the upkeep rewrite adds it.
+| **Env vars / secrets** | New/renamed keys, changed defaults, new required credential | before |
+| **DB migrations** | Migration files, DDL, index builds | after — plus backup reminder when destructive |
+| **Client data** | Backfills, repair scripts, re-indexing, cache invalidation | after, with the exact command |
+| **Feature flags** | A flag this PR reads or flips | before (create) / after (flip) |
+| **Config & infra** | compose, nginx, Dockerfile, CI, cron | whichever applies; name the file |
+| **Deployed clients** | API/shape change a mobile app or other service consumes | before — the consumer ships first |
+| **Package publish** | Version bump needing `npm publish` / a tag | after |
+| **Merge order** | A PR that must land first, a stacked branch | before, linked |
+| **Manual verification** | Something only a human on prod can confirm | after |
 
 **Deploy-on-merge repos** (merge to default = ship — vitrinka via Deployik, for one):
-anything the code needs to boot — env vars above all — is a **Before merging** item,
-never After. Say so: `⚠️ merging deploys — VITRINKA_SMTP_CA must be set in production first.`
+anything the code needs to boot — env vars above all — is a `before:` bullet, never
+`after:`. Say so: `⚠️ before: merging deploys — VITRINKA_SMTP_CA must be set in production first.`
+
+## The links sweep
+
+Before writing: `list_boards` scoped to this repo/branch (plus `pr-<N>-<repo>` when the
+PR exists) fills the three board rows; `get_task` on the `vt-<id>` from the branch or
+title fills Task and Epic. Nothing found → `—` (never `create_board` for the body's
+sake). A board or task appearing later in the PR's life lands in the table on the
+upkeep rewrite.
 
 ## Keeping it true (`prm`)
 
 The body describes the PR **as it will merge**. Rewrite (`gh pr edit <N> --body-file <f>`)
-when a round uncovers/retires a post-merge step, moves the scope, or stales
-`Verification`. Routine churn needs no edit. Human-edited prose stays theirs — only the
-action sections may be appended to. A stale `After merging` is worse than none.
+when a round uncovers/retires a blocker, moves the scope, stales `Verification`, or
+adds a link. Routine churn needs no edit. Human-edited prose stays theirs — only
+`Blockers & risks` and the links table may be appended to. A stale blocker is worse
+than none.
 
 ## Worked example
 
-The vitrinka install-snippet PR (#252), rewritten from a file-by-file log:
+The vitrinka install-snippet PR (#252):
 
 ```markdown
-Anyone connecting an agent to vitrinka had to hand-edit the install command —
-copy it, then find and replace the workspace, the base URL and a token they had
-to mint somewhere else first. This makes those values editable in the snippet
-itself, and mints the token for you.
+## Why this exists
+`/connect` ships install commands with `<your-token>` placeholders; every agent hookup
+is copy → hunt the placeholder → mint a token in Settings → paste back. First minute
+of the product, worst-feeling one.
 
-## Why
+## Approach
+Placeholder values become editable spans inside the snippet (click, Tab cycles, Esc
+restores); copy yields the resolved command. `/connect` pre-fills scope, base URL and
+token; Settings → Tokens mints and fills in one step under the existing one-time-reveal
+rule. JS-off renders the values as plain selectable text. No new endpoint.
 
-The `/connect` page shipped copy-paste commands with placeholder text in them.
-Every new agent hookup meant copy → paste → hunt for `<your-token>` → open
-Settings in another tab → mint a token → paste it back. It is the first thing a
-new user does and it was the worst-feeling minute of the product.
+## Intent
+A new user connects an agent from `/connect` with one copy and zero tab switches.
 
-Spec: `docs/specs/2026-08-12-install-snippet-decisions.md` · board `b/456`
-
-## What changes
-
-- **Install commands are editable in place.** Click an underlined value, type,
-  Tab to the next one, Esc restores the placeholder. Copy gives you the resolved
-  command, not the template.
-- **`/connect` fills in what it knows** — scope, base URL and token on the MCP
-  tab; `--base` and the operator name on the CLI tab.
-- **Settings → Tokens can mint and fill in one step.** The filled snippet is the
-  one-time reveal — the same rule as the existing mint form.
-- **Works with JavaScript off**, where the values render as plain selectable text.
-
-## Before merging
-
-None. No new env vars, no config, no migration.
-
-## After merging
-
-Nothing required. Ships with the normal deploy; no flag to flip.
+## Blockers & risks
+None.
 
 ## Verification
+Hands-on on local dev: Tab cycling, Esc restore, resolved copy text; a minted `vks_…`
+token landed in both the command and the tokens table. `go test ./internal/site
+./internal/web` green. Not covered: no e2e drives the edit interaction —
+`TestConnectHasEditableSnippetVars` asserts server-rendered markup only.
 
-Hands-on against a local dev server: edited vars on `/connect` (Tab cycling, Esc
-restore, resolved copy text), and minted a real `vks_…` token from Settings that
-landed both in the command and in the tokens table. `go test ./internal/site
-./internal/web` green.
-
-Not covered: no e2e test drives the editing interaction — the guard is
-`TestConnectHasEditableSnippetVars`, which only asserts the server-rendered markup.
+## Links
+| | |
+|---|---|
+| Task | https://…/t/vt-312 |
+| Epic | — |
+| Spec / design | https://…/b/456 |
+| QA / testing | — |
+| Review | https://…/b/pr-252-vitrinka |
+| Opened by session | `9c1e…` |
 ```

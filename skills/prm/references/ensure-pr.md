@@ -21,14 +21,16 @@ Steps:
    `node ~/.claude/lib/git/bin/before-review.ts --repo <ABS repo path>`
    (LITERAL absolute path); a non-null `resolvedBeforeReviewCmd` runs BEFORE anything
    else here, null → skip silently — dev servers and bundlers must stop before you
-   diff. Then write the body per `pr-body.md` — run its action-item lens and its
-   vitrinka-links sweep over `git diff <base>...HEAD`, so migrations, env vars, flags,
-   deployed-client breaks and session boards surface before the PR exists.
+   diff. Then write the body per `pr-body.md` — run its blockers lens and links sweep
+   over `git diff <base>...HEAD`, and fill `Opened by session` from
+   `printenv CLAUDE_CODE_SESSION_ID`, so migrations, env vars, flags, deployed-client
+   breaks, boards and the opening session surface before the PR exists.
 1. Resolve the current-branch PR via `node ~/.claude/lib/git/bin/resolve-fetch.ts`.
 2. **PR already exists** → return its URL + number (never error or recreate). Check its
-   body against `pr-body.md`: a commit-log dump or missing `Before merging` /
-   `After merging` → rewrite (`gh pr edit <N> --body-file <file>`) and say so. A body a
-   human hand-wrote is theirs — append the missing action sections, keep their prose.
+   body against `pr-body.md`: a commit-log dump, a missing `Blockers & risks` section
+   or a missing links table → rewrite (`gh pr edit <N> --body-file <file>`) and say so.
+   A body a human hand-wrote is theirs — append the missing section/table, keep their
+   prose.
 3. `resolve-fetch.ts` returns `{ "noPr": true, … }`:
    - `onDefaultBranch === true` → **STOP**: never open a PR from the default branch;
      tell the user to create/switch to a feature branch.

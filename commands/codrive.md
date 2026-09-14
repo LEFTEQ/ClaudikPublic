@@ -4,7 +4,7 @@ name: codrive
 description: User signals "drive it for me, I'll log in" — drive a multi-step browser flow via Playwright MCP, handing the visible browser to the user at identity gates and resuming after.
 ---
 
-Drive the browser flow in $ARGUMENTS (a URL, a parked plan, or a description) end-to-end in the **Onyx browser**: first `mcp__onyx__browser_start(session: $CLAUDE_CODE_SESSION_ID, headless: false, idle_timeout_seconds: 0)`, then drive it with the playwright / chrome-devtools MCP tools, which attach to that same window by session lookup (`claude-guards browser` blocks them otherwise). Vault sign-ins go through `web_login` / `browser_fill` with the same `session`. Empty args → drive the flow already under discussion this session; if there is none, ask what to drive.
+Drive the browser flow in $ARGUMENTS (a URL, a parked plan, or a description) end-to-end in the **Onyx browser**: first `mcp__onyx__browser_start(session: $CLAUDE_CODE_SESSION_ID, headless: false, idle_timeout_seconds: 3600)`, then drive it with the playwright / chrome-devtools MCP tools, which attach to that same window by session lookup (`claude-guards browser` blocks them otherwise). Vault sign-ins go through `web_login` / `browser_fill` with the same `session`. Empty args → drive the flow already under discussion this session; if there is none, ask what to drive.
 
 You drive; the human is the identity. The Onyx window is visible, carries the Onyx extension, and is shared — the user acts in it directly when needed.
 

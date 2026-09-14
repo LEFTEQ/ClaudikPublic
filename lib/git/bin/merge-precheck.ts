@@ -137,18 +137,31 @@ export function parseMergePolicy(raw: string | undefined): { policy: MergePolicy
     : { policy: "review", invalid: raw ?? null };
 }
 
-// MERGE_METHOD: which `gh pr merge` flag lands the PR — merge (default, a merge commit),
-// squash (one commit titled after the PR), rebase. Repos on a squash-only GitHub setting
-// declare `MERGE_METHOD=squash` so the merge step never trips the server refusal.
-// Any other value → "merge" and the raw value is echoed so the caller can flag the typo.
+// MERGE_METHOD: which `gh pr merge` flag lands the PR — merge (a merge commit), squash
+// (one commit titled after the PR), rebase. A repository that has disabled a method
+// refuses it at merge time, so when `allowed` is known the choice is derived from it
+// rather than assumed: keep merge where it is still offered, else squash, else rebase.
+// That makes a squash-only repository work with no config at all — the old hardcoded
+// "merge" default tripped the server refusal on every one of them.
+// An explicit MERGE_METHOD wins, EXCEPT when the repository has disabled it: naming a
+// method the server will refuse is drift, so it falls back and the raw value is echoed
+// as `invalid` — the same channel a typo uses — for the caller to flag.
 export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
 export type MergeMethod = (typeof MERGE_METHODS)[number];
-export function parseMergeMethod(raw: string | undefined): { method: MergeMethod; invalid: string | null } {
+export type AllowedMergeMethods = Partial<Record<MergeMethod, boolean>>;
+export function parseMergeMethod(
+  raw: string | undefined,
+  allowed?: AllowedMergeMethods,
+): { method: MergeMethod; invalid: string | null } {
+  // No signal from the repository → the historical default, unchanged.
+  const fallback = (): MergeMethod =>
+    !allowed ? "merge" : allowed.merge ? "merge" : allowed.squash ? "squash" : allowed.rebase ? "rebase" : "merge";
   const v = (raw ?? "").trim().toLowerCase();
-  if (!v) return { method: "merge", invalid: null };
-  return (MERGE_METHODS as readonly string[]).includes(v)
-    ? { method: v as MergeMethod, invalid: null }
-    : { method: "merge", invalid: raw ?? null };
+  if (!v) return { method: fallback(), invalid: null };
+  if (!(MERGE_METHODS as readonly string[]).includes(v)) return { method: fallback(), invalid: raw ?? null };
+  const method = v as MergeMethod;
+  if (allowed && allowed[method] === false) return { method: fallback(), invalid: raw ?? null };
+  return { method, invalid: null };
 }
 
 // REQUIRED_BOT_REVIEWERS is comma/space separated. Absent/empty → default review-bot[bot].
@@ -290,7 +303,10 @@ function gatherPaths(headRef?: string) {
 
 async function main(): Promise<void> {
   const prArg = process.argv.slice(2).filter((a) => !a.startsWith("--"))[0];
-  const repo = JSON.parse(sh("gh", ["repo", "view", "--json", "nameWithOwner,defaultBranchRef"]));
+  const repo = JSON.parse(sh("gh", [
+    "repo", "view", "--json",
+    "nameWithOwner,defaultBranchRef,mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed",
+  ]));
   const [owner, name] = repo.nameWithOwner.split("/");
   const fields = "number,state,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,headRefName,baseRefName,url,title,isDraft";
   const pr = JSON.parse(sh("gh", ["pr", "view", ...(prArg ? [prArg] : []), "--json", fields]));
@@ -303,7 +319,9 @@ async function main(): Promise<void> {
   const defaultBranch = resolveDefaultBranch(cfg, repo.defaultBranchRef?.name);
   const requiredBotReviewers = parseBotList(cfg.REQUIRED_BOT_REVIEWERS);
   const mergePolicy = parseMergePolicy(cfg.MERGE_POLICY);
-  const mergeMethod = parseMergeMethod(cfg.MERGE_METHOD);
+  const mergeMethod = parseMergeMethod(cfg.MERGE_METHOD, {
+    merge: repo.mergeCommitAllowed, squash: repo.squashMergeAllowed, rebase: repo.rebaseMergeAllowed,
+  });
   const botData = pr.state?.toUpperCase() === "OPEN"
     ? gatherBotData(owner, name, pr.number)
     : { requested: [], latestReviews: [] };
