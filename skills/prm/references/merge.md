@@ -17,10 +17,12 @@ in a worktree → the anchor is wrong; re-run, never act on that envelope.
 
 → JSON: `{owner, repo, pr, url, title, branch, defaultBranch, onDefaultBranch,
 worktree, mainClone, isWorktree, slug, checks, gates, botApproval,
-requiredBotReviewers, afterMergeCmd, resolvedAfterMergeCmd, raw}`.
+requiredBotReviewers, afterMergeCmd, resolvedAfterMergeCmd, stopServers, raw}`.
 `botApproval = {ok, required[], pending[]}`; `gates.botApprovalOk` mirrors it as the
 `botReview` gate. `mergePolicy` is `review` (default) or `self` — see the keys below;
 a non-null `mergePolicyInvalid` is a typo in the config: say so, run as `review`.
+`stopServers` is `worktree` (default), `repo` or `none` — step 4c; a non-null
+`stopServersInvalid` is likewise a typo: say so, run as `worktree`.
 
 Hard guards — STOP immediately:
 - `onDefaultBranch` → "On the default branch — nothing to merge here." Never tell the
@@ -185,6 +187,17 @@ Two non-negotiables: (a) every git op runs from the main clone via `git -C <main
    diagnostic's `fix` line, never retry, never `devbox down` on your own; `ok:true`
    with `WS_NO_RUNTIME_META` (never instantiated) is a clean no-op. `devbox` missing
    from PATH → skip silently (a non-devbox Mac).
+4c. **Main-clone dev servers** — `AFTER_MERGE_STOP_SERVERS` (after EITHER path, hook
+   or generic, because a repo whose work lands from the main clone never had a
+   worktree to scope step 4 to). `worktree` (default) → nothing extra; step 4 already
+   covered it. `repo` → repeat step 4's dev-server mapping with `<mainClone>` in place
+   of `<worktree>`: `lsof -a -d cwd +D <mainClone> -t`, the SAME mandatory command-line
+   intersection and the SAME never-kill list, then `kill -TERM` → `sleep 3` →
+   `kill -KILL` stragglers. Docker is NOT touched here and the clone is never removed.
+   `none` → skip entirely, even in step 4. A process whose cwd is the main clone but
+   belongs to ANOTHER session's port window is still a kill (the cwd IS the repo) —
+   what protects other sessions is the never-kill list, not ownership guessing; report
+   every pid + command you killed. Unset key = `worktree`.
 5. **Delete the local branch, then prune** — always, after EVERY path: `ExitWorktree`
    and an `AFTER_MERGE_CMD` hook may or may not have deleted it, and a merged branch
    never survives the session. `git -C <mainClone> branch -d <branch>`; "not found"
@@ -224,6 +237,14 @@ MERGE_METHOD=squash
 # Runs INSTEAD of the generic worktree-remove + branch -d after a successful merge.
 # Tokens substituted by merge-precheck.ts: {slug} {branch} {worktree} {pr}
 AFTER_MERGE_CMD=/wk:cleanup {slug} --remove --yes --delete-remote
+
+# Which dev servers a successful merge stops, ON TOP of whichever teardown path ran.
+# worktree (default): only the merged worktree's, as step 4 already does. repo: also
+# the ones whose cwd is the MAIN CLONE — for repos that work from main (content ships
+# with no worktree) or leave a preview server there after hand-testing. none: stop
+# nothing. Same command-line filter and never-kill list either way; never Docker,
+# never the clone itself.
+AFTER_MERGE_STOP_SERVERS=repo
 
 # Runs when prm ENTERS the review loop, and again at the start of each round.
 # Same tokens. Must be idempotent and cheap. Stops processes we own (dev servers,

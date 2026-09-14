@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { summarizeChecks, summarizeGates, substituteHookTokens, summarizeBotApproval, isBotApprovalReview, parseBotList, canonicalizeBotLogin, parseMergePolicy, parseMergeMethod, resolveDefaultBranch } from "../bin/merge-precheck.ts";
+import { summarizeChecks, summarizeGates, substituteHookTokens, summarizeBotApproval, isBotApprovalReview, parseBotList, canonicalizeBotLogin, parseMergePolicy, parseMergeMethod, parseStopServers, resolveDefaultBranch } from "../bin/merge-precheck.ts";
 import { parseConfig } from "../bin/sync-context.ts";
 
 test("no checks configured → NONE", () => {
@@ -285,6 +285,15 @@ test("MERGE_POLICY: absent → review; self → self; a typo falls back to revie
   assert.deepEqual(parseMergePolicy(undefined), { policy: "review", invalid: null });
   assert.deepEqual(parseMergePolicy(" Self "), { policy: "self", invalid: null });
   assert.deepEqual(parseMergePolicy("auto"), { policy: "review", invalid: "auto" });
+});
+
+// AFTER_MERGE_STOP_SERVERS widens a kill, so an unrecognized value must never be read as
+// the wider scope — it falls back to worktree and the raw value is echoed for the caller.
+test("AFTER_MERGE_STOP_SERVERS: absent → worktree; repo/none honoured; a typo falls back and is echoed", () => {
+  assert.deepEqual(parseStopServers(undefined), { scope: "worktree", invalid: null });
+  assert.deepEqual(parseStopServers(" Repo "), { scope: "repo", invalid: null });
+  assert.deepEqual(parseStopServers("none"), { scope: "none", invalid: null });
+  assert.deepEqual(parseStopServers("all"), { scope: "worktree", invalid: "all" });
 });
 
 // DEFAULT_BRANCH: a machine adopting a new integration branch ahead of the team sets it in

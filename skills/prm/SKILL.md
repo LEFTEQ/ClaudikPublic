@@ -175,7 +175,8 @@ the PR URL.
 On a `merged` event (ours or external): **step zero, `TaskStop` this PR's Monitor by
 its recorded task id** (self-exit lags a poll cycle — same on `closed` and every stop
 path). Then run `merge.md`'s Teardown section — watcher stop, cwd guard,
-self-occupant triage, `AFTER_MERGE_CMD` hook or generic scoped cleanup, local branch
+self-occupant triage, `AFTER_MERGE_CMD` hook or generic scoped cleanup, the
+`AFTER_MERGE_STOP_SERVERS` sweep (runs after either path), local branch
 delete, prune, pull.
 Guards (ALL required): **merged** confirmed · **clean worktree** (`status
 --porcelain` empty; dirty → KEEP, report `kept (uncommitted changes): <path>`) ·

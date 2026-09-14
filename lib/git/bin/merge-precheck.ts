@@ -164,6 +164,25 @@ export function parseMergeMethod(
   return { method, invalid: null };
 }
 
+// AFTER_MERGE_STOP_SERVERS: which dev servers teardown stops, on top of whichever
+// cleanup path ran (the AFTER_MERGE_CMD hook or the generic one).
+//   worktree (default) — only the merged worktree's, which generic cleanup already does.
+//   repo               — also the ones whose cwd is the MAIN CLONE, for repos that work
+//                        from the default branch or leave a preview server there.
+//   none               — stop nothing, even in generic cleanup.
+// Same command-line filter and never-kill list in every mode; never Docker, and the
+// main clone itself is never removed. A typo → "worktree" (the conservative reading),
+// echoed as `invalid` so the caller flags it rather than silently widening a kill.
+export const STOP_SERVERS_SCOPES = ["worktree", "repo", "none"] as const;
+export type StopServersScope = (typeof STOP_SERVERS_SCOPES)[number];
+export function parseStopServers(raw: string | undefined): { scope: StopServersScope; invalid: string | null } {
+  const v = (raw ?? "").trim().toLowerCase();
+  if (!v) return { scope: "worktree", invalid: null };
+  return (STOP_SERVERS_SCOPES as readonly string[]).includes(v)
+    ? { scope: v as StopServersScope, invalid: null }
+    : { scope: "worktree", invalid: raw ?? null };
+}
+
 // REQUIRED_BOT_REVIEWERS is comma/space separated. Absent/empty → default review-bot[bot].
 export function parseBotList(raw: string | undefined): string[] {
   const items = (raw ?? "").split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -356,6 +375,8 @@ async function main(): Promise<void> {
   // codegen all thrash the disk while dev servers/emulators do stale work. /prm
   // runs this on entering the loop AND at the start of each round, so it must be
   // idempotent and cheap (a good one is both).
+  const stopServers = parseStopServers(cfg.AFTER_MERGE_STOP_SERVERS);
+
   const beforeReviewCmd = cfg.BEFORE_REVIEW_CMD ?? null;
   const resolvedBeforeReviewCmd = beforeReviewCmd
     ? substituteHookTokens(beforeReviewCmd, hookCtx)
@@ -370,6 +391,7 @@ async function main(): Promise<void> {
     mergePolicy: mergePolicy.policy, mergePolicyInvalid: mergePolicy.invalid,
     mergeMethod: mergeMethod.method, mergeMethodInvalid: mergeMethod.invalid,
     afterMergeCmd, resolvedAfterMergeCmd,
+    stopServers: stopServers.scope, stopServersInvalid: stopServers.invalid,
     beforeReviewCmd, resolvedBeforeReviewCmd,
     raw: { state: pr.state, mergeable: pr.mergeable, mergeStateStatus: pr.mergeStateStatus, reviewDecision: pr.reviewDecision, isDraft: pr.isDraft },
   }, null, 2) + "\n");
