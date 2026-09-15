@@ -110,7 +110,7 @@ Under `--discover`, stop here (write `journeys.md`, no commit unless asked). Oth
 - **mobile** writers share **one** Appium simulator → semaphore of 1 (serial lane). This cap of 1 is **skill-enforced, not config**: ignore any `.e2e.json` `concurrency.mobile > 1` and never boot a second simulator — two Appium sessions on one device corrupt state. Non-negotiable regardless of urgency.
 - **app-code edits** are a semaphore of 1 held **only by the orchestrator** (Phase 3). Writers never acquire it.
 
-**Fan out one writer subagent per feature.** Web writers in parallel; mobile writers queued on the single lane. Dispatch each writer (`Task`, general-purpose) with this brief:
+**One persistent writer per lane, `model: opus`** (the sanctioned cheaper-model exception — Opus 5 is enough for spec writing). Spawn `concurrency.web` web writers and one mobile writer as named `Agent`s (general-purpose, `model: "opus"`), brief each once with the brief below plus its first feature, then hand it every further feature on its lane via `SendMessage` ("go now, run continuously; your next message is the feature's return or a real blocker") — never a fresh spawn per feature, so discovered selectors, seeds and conventions carry over. Shut every writer down when Phase 2 ends. The brief:
 
 > Own this feature's journeys end-to-end. **You may NOT edit app source — only drive and write specs.**
 > 1. Detect stack from `.e2e.json.stacks`. Web → Playwright MCP (`--isolated`, `references/playwright-driver.md`). Mobile → Appium/WDIO (`references/appium-driver.md`: dev-client/Metro reachability, E2E reset+seed **before** first navigation, `~testID` selectors).

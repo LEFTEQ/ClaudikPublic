@@ -6,7 +6,7 @@ Reader: the repo owner months later with zero context, deciding *"is this still 
 merging, and what does merging it cost me?"*. Short and dense: every sentence carries a
 fact — a behaviour, a decision, a name, a number — and a sentence that states nothing
 new is cut. No narrative, no file inventory (the Files tab is one), nothing that needs
-the diff open to parse. Whole body ≤ ~150 words above the links table.
+the diff open to parse. Whole body ≤ ~150 words outside the links table.
 
 ## Anti-patterns
 
@@ -31,13 +31,6 @@ the diff open to parse. Whole body ≤ ~150 words above the links table.
 ## Intent
 <1–2 sentences: the outcome merging should produce — what to judge this PR against.>
 
-## Blockers & risks
-<one bullet per item, tagged `before:` (must happen first) or `after:` (the merge does
-not do it itself), naming the exact command / key / file — or `None.`>
-
-## Verification
-<1–3 sentences: what was proven and how; what was NOT covered.>
-
 ## Links
 | | |
 |---|---|
@@ -47,6 +40,13 @@ not do it itself), naming the exact command / key / file — or `None.`>
 | QA / testing | <url · url> |
 | Review | <url> |
 | Opened by session | `<CLAUDE_CODE_SESSION_ID>` |
+
+## Blockers & risks
+<one bullet per item, tagged `before:` (must happen first) or `after:` (the merge does
+not do it itself), naming the exact command / key / file — or `None.`>
+
+## Verification
+<1–3 sentences: what was proven and how; what was NOT covered.>
 ```
 
 Sections and table rows are **never omitted** — `None.` / `—` tells the reader the
@@ -55,7 +55,7 @@ Spec / design = brainstorming, decision-log and design boards; QA / testing = te
 sets, journeys, recorded sessions; Review = the `pr-<N>-<repo>` board and Eve review
 boards; Opened by session = `printenv CLAUDE_CODE_SESSION_ID` at create time, never
 changed by later rounds. Every URL is the server-returned `url`, full, never shortened.
-An optional `<details>` implementation-notes block may follow the table, never precede it.
+An optional `<details>` implementation-notes block may close the body after Verification, never sit above it.
 
 ## The blockers lens
 
@@ -86,6 +86,16 @@ title fills Task and Epic. Nothing found → `—` (never `create_board` for the
 sake). A board or task appearing later in the PR's life lands in the table on the
 upkeep rewrite.
 
+**A links cell is a full URL or `—`, nothing else.** Never a description of where a
+link could be found ("see epic refs", "board published from this session", a bare
+`docs/specs/…` path). If a board publish or a task upload is still in flight when the
+body is written, either wait for its URL before creating the PR, or write `—` and
+rewrite the body the moment the URL lands (`gh pr edit <N> --body-file`) — the
+publisher's report and the vitrinka task refs both carry it. Repo files (specs,
+decision logs) link as `https://github.com/<owner>/<repo>/blob/<branch>/<path>`.
+Observed 2026-09-15 on FixIt#1448: the board URL was in hand and the row still said
+"hand-test board: see epic refs" — a reader months later cannot click that.
+
 ## Keeping it true (`prm`)
 
 The body describes the PR **as it will merge**. Rewrite (`gh pr edit <N> --body-file <f>`)
@@ -113,15 +123,6 @@ rule. JS-off renders the values as plain selectable text. No new endpoint.
 ## Intent
 A new user connects an agent from `/connect` with one copy and zero tab switches.
 
-## Blockers & risks
-None.
-
-## Verification
-Hands-on on local dev: Tab cycling, Esc restore, resolved copy text; a minted `vks_…`
-token landed in both the command and the tokens table. `go test ./internal/site
-./internal/web` green. Not covered: no e2e drives the edit interaction —
-`TestConnectHasEditableSnippetVars` asserts server-rendered markup only.
-
 ## Links
 | | |
 |---|---|
@@ -131,4 +132,13 @@ token landed in both the command and the tokens table. `go test ./internal/site
 | QA / testing | — |
 | Review | https://…/b/pr-252-vitrinka |
 | Opened by session | `9c1e…` |
+
+## Blockers & risks
+None.
+
+## Verification
+Hands-on on local dev: Tab cycling, Esc restore, resolved copy text; a minted `vks_…`
+token landed in both the command and the tokens table. `go test ./internal/site
+./internal/web` green. Not covered: no e2e drives the edit interaction —
+`TestConnectHasEditableSnippetVars` asserts server-rendered markup only.
 ```

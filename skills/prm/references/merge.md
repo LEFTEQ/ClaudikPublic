@@ -186,7 +186,12 @@ Two non-negotiables: (a) every git op runs from the main clone via `git -C <main
    so it can never reap more than gc would. `ok:false` with `WS_NOT_DEAD` → report the
    diagnostic's `fix` line, never retry, never `devbox down` on your own; `ok:true`
    with `WS_NO_RUNTIME_META` (never instantiated) is a clean no-op. `devbox` missing
-   from PATH → skip silently (a non-devbox Mac).
+   from PATH → skip silently (a non-devbox Mac). `WS_REAP_FAILED` saying "held or
+   not parked/stopped" on a workspace whose apps are all inactive is a **hold
+   lease** (4 h, renewed by every `devbox up`/`run`; `park`/`down` never clear it):
+   `devbox unhold <workspace>` then reap again — seen 2026-09-14 on
+   `fixit-work-vt-863`. A workspace with apps still ACTIVE is a different case:
+   report it, never `unhold` your way past a live session.
 4c. **Main-clone dev servers** — `AFTER_MERGE_STOP_SERVERS` (after EITHER path, hook
    or generic, because a repo whose work lands from the main clone never had a
    worktree to scope step 4 to). `worktree` (default) → nothing extra; step 4 already
