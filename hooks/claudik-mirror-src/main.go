@@ -141,15 +141,17 @@ func run(cmd, repo, manifestPath, targetOverride string, push, verbose bool) int
 		return 1
 	}
 	if !dirty {
+		// Still fall through to the push: a previous bare `sync` may have
+		// committed without pushing, and that commit must not stay stranded.
 		fmt.Println("Mirror already up to date — nothing to commit.")
-		return 0
+	} else {
+		msg := fmt.Sprintf("sync: mirror %s", gitShortSHA(repo))
+		if err := commitAll(m.Target, msg); err != nil {
+			fmt.Fprintf(os.Stderr, "commit: %v\n", err)
+			return 1
+		}
+		fmt.Printf("Committed in mirror: %s\n", msg)
 	}
-	msg := fmt.Sprintf("sync: mirror %s", gitShortSHA(repo))
-	if err := commitAll(m.Target, msg); err != nil {
-		fmt.Fprintf(os.Stderr, "commit: %v\n", err)
-		return 1
-	}
-	fmt.Printf("Committed in mirror: %s\n", msg)
 
 	if push {
 		if !hasRemote(m.Target) {
