@@ -1,7 +1,6 @@
 ---
-disable-model-invocation: true
 name: codrive
-description: User signals "drive it for me, I'll log in" — drive a multi-step browser flow via Playwright MCP, handing the visible browser to the user at identity gates and resuming after.
+description: Use when a browser flow can only finish with the human at the keyboard for identity gates — sign-in, 2FA, eObčanka/card reader, payment, consent — and every other step should be driven for them ("drive it for me, I'll log in"). Any headed (`headless: false`) browser run routes here.
 ---
 
 Drive the browser flow in $ARGUMENTS (a URL, a parked plan, or a description) end-to-end in the **Onyx browser**: first `mcp__onyx__browser_start(session: $CLAUDE_CODE_SESSION_ID, headless: false, idle_timeout_seconds: 3600)`, then drive it with the playwright / chrome-devtools MCP tools, which attach to that same window by session lookup (`claude-guards browser` blocks them otherwise). Vault sign-ins go through `web_login` / `browser_fill` with the same `session`. Empty args → drive the flow already under discussion this session; if there is none, ask what to drive.

@@ -19,9 +19,25 @@ One lean, Obsidian-native convention shared by Claude Code and Codex. No inbox, 
 - Each home has its own `MEMORY.md` index. The personal `MEMORY.md` is the only auto-loaded surface, so its **first section points at the team index**: `Team memory: <repo>/.claude/memory/MEMORY.md — open it when the task touches project code.` Cross-links between homes are plain relative-to-repo paths.
 - A project without a repo (or scratch work) uses the personal home for everything.
 
-## File format (both homes, identical)
+## The ledger (both homes, identical; 2026-09-20)
 
-One file = one durable topic contract, not one incident. Prefer updating a themed survivor once two notes overlap; consolidation is mandatory at three or more related notes. Kebab-case filename `<type>-<slug>.md`:
+A home is an append-only ledger of one-sentence rows, owned by the `memo` applet (the tools repo; skill `memo`, reference `docs/memo.md`):
+
+```text
+<home>/
+  LEDGER.md     append-only truth, every row ever written; never edited by hand
+  MEMORY.md     rendered by `memo render`: pinned rows, then the top rows by usage score, 100 lines max
+  usage.jsonl   usage events (cite, show, read, touch) written by the Stop hook and `memo touch`
+  notes/        detail files, only where the narrative earns one (format below)
+```
+
+Row grammar: `- #<id> <date> <type>/<topic>[!] <sentence> [-> <link> ...] ^m<id>`. One fact, one sentence, a period, plain hyphens. `!` pins. A row is never edited; a correction is a new row `supersedes #N: ...`, a removal is `retires #N.`. Links are Obsidian: `[[notes/<slug>]]`, `[[LEDGER#^m45]]`, `[[<alias>/LEDGER#^m12]]` for another home (`memo homes` lists aliases; `memo vault` keeps `~/Memory` so Obsidian resolves them).
+
+- **Capture** is `memo add feedback/git "Never ...; ..."` - never a hand-written row, never Edit/Write on the three ledger files (the hook refuses).
+- **Act, then cite.** When a row changes what you do, write `#45` in your reply or tool input; the Stop hook counts it. Citations are the only thing that keeps a row on the hot surface, so cite honestly and never decoratively. `memo touch 45` records a use explicitly.
+- **Look up** with `memo show 45` (row plus its notes) and `memo find <words>` (the whole ledger, superseded rows included). `MEMORY.md` is the hot surface, not the whole memory.
+
+A detail note (`notes/<slug>.md`) exists only for a recipe, a measured incident, or a ladder that a sentence cannot hold, and only when a row links it:
 
 ```markdown
 ---
@@ -42,7 +58,7 @@ last-used: YYYY-MM-DD        # bumped when the note actually changes behavior mi
 <supporting detail only as evidence for the rule. Link related memories with [[name]].>
 ```
 
-`name`, `description`, `type`, `status` are required top-level Obsidian properties. Nested `metadata:` and session IDs are forbidden. `superseded` is transitional only and must name the replacement; normal pruning absorbs the useful content and deletes the old note. Legacy snake_case files keep their names until a semantic consolidation touches them.
+`name`, `description`, `type`, `status` are required top-level Obsidian properties. Nested `metadata:` and session IDs are forbidden. A home without `LEDGER.md` is a legacy v2 home: convert it with `memo migrate <home>` then `memo import`; until then its notes follow this format alone and the pre-ledger lifecycle in git history of this file.
 
 ## The ladder — where knowledge actually lives
 
@@ -58,15 +74,14 @@ A memory must be **paid for**: either **(a)** the user's correction or confirmed
 
 The body template (Wrong move/Rule) is how a note is *written*, not why it *exists* — a derivable fact phrased as "Wrong move: rebuilding X — it already exists" is still trash. **Banned classes, in any format:** existence-of-feature notes ("the engine already ships X" — discoverable by reading the engine), shipped-state and PR-changelog narratives (git-derivable), vendor-documented behavior, code patterns visible in one file, in-progress task state.
 
-**Update-over-create.** Check the target home's `MEMORY.md` for an existing contract on the topic; extend/correct it rather than adding a sibling. Delete memories proven wrong, obsolete, or fully derivable.
+**Supersede-over-duplicate.** `memo find <words>` before adding; a row that refines an existing fact is `memo add ... --supersedes N`, a row proven wrong is `memo add ... --retires N`. Never a second row saying the same thing.
 
-## Lifecycle — born provisional, forgotten when unused
+## Lifecycle — usage decides, nothing is deleted
 
-- **Born provisional.** A lesson from a single incident starts `status: provisional` with `expires: <today + 60d>`. A direct user instruction ("remember this", an explicit correction) or a second independent occurrence is born / promoted `active`.
-- **Promotion.** When a provisional note actually prevents the wrong move again (or the trap re-fires), set `status: active`, drop `expires`, bump `last-verified`.
-- **Usage index.** When a note actually changes what you do mid-task, bump `last-used: YYYY-MM-DD` in its frontmatter — cheap, best-effort, any session. Reading is not using; acting on it is.
-- **Forgetting is healthy.** The weekly distill evicts notes with no `last-used` bump for ~90 days (creation/verification date counts as the start). A note that was never relevant across hundreds of turns is context tax, not knowledge — deleting it is the system working. Applies to every type: a `feedback` rule that never mattered, or that graduated to CLAUDE.md, loses its file too.
-- **Expiry.** An expired provisional is deletable on sight by any session — no re-litigation. `memorylint check` flags them.
+- **Rows are permanent.** The ledger only grows; `supersedes`/`retires` change what is active, never what is recorded.
+- **The hot surface is earned.** `MEMORY.md` orders rows by a decayed usage score (90-day half-life over cite/show/read/touch events); a row with no event for 180 days leaves `MEMORY.md` but stays in the ledger and in `memo find`. Pinned rows (`!`) never leave; pin only hard safety and first-minutes traps.
+- **Reading is not using.** The harness loads `MEMORY.md` whole, so loading counts for nothing; only a citation, a `memo show`, a Read of a linked note or a `memo touch` counts.
+- **Snapshots.** The personal home is a local git repo: `memo add` snapshots after every write, `memo log` shows history, `memo restore` brings a file back. Team homes are versioned by their repo.
 
 ## Recall is a claim
 
@@ -85,20 +100,21 @@ In doubt between T1 and T2 → pick T2; T1 surfaces load every session and must 
 
 ## Recall — how memories get found
 
-Recall runs entirely off `MEMORY.md` descriptions:
+Recall runs off the rows in `MEMORY.md` (hot surface) and `memo find` (everything):
 
-- **Write descriptions as triggers, not summaries.** "Before pushing back 'data doesn't exist', check discriminated rows" beats "notes about the reviews table". Start with the situation that should surface the memory.
-- Index line format: `- [Title](file.md) — <trigger hook>`.
-- Keep both indexes grouped: `## Rules & preferences` (feedback/user, stable) above `## Active work` (project status, volatile) above `## Reference` (lookup material).
+- **Write the sentence as the trap plus the rule.** "Never X; Y happens." surfaces on its own; a row that only names a topic never fires. Backticks for paths and commands.
+- **Topic tags are the grouping.** `feedback/git`, `reference/ci`: short, kebab, reused across rows; `memo find git` is the index.
+- A note's `description` (when a row links one) stays trigger-phrased.
 
 ## Caps + prune-on-write
 
 | Surface | Cap |
 |---|---|
-| personal home | ≤ ~15 notes |
-| team home | ≤ ~30 notes |
-| each `MEMORY.md` | ≤ ~100 lines |
-| one memory file | ≤ ~150 lines |
+| `LEDGER.md` | none - append-only |
+| rendered `MEMORY.md` | 100 lines (memo enforces) |
+| `notes/` in a personal home | ≤ ~15 files |
+| `notes/` in a team home | ≤ ~30 files |
+| one note | ≤ ~150 lines |
 | repo `CLAUDE.md` | ≤ ~300 lines / ~4k tok |
 
 Note ceilings are the load-bearing cap: models follow ~150–200 instructions before compliance degrades, so every surviving note competes with the actual rules. Hitting a ceiling forces consolidation or eviction — never a cap raise.
@@ -110,10 +126,10 @@ Note ceilings are the load-bearing cap: models follow ~150–200 instructions be
 ## Subcommands (`/memory <arg>`)
 
 ### save `[text]`
-Capture now. With text: treat it as the fact. Without: scan the conversation for uncaptured corrections/discoveries. Apply the derivability gate, route by the table above, write file + index line, run prune-on-write. Show a one-line summary per write — no confirmation prompt.
+Capture now. With text: treat it as the fact. Without: scan the conversation for uncaptured corrections/discoveries. Apply the derivability gate, route by the table above, `memo find` for an existing row, then `memo add <type>/<topic> "<sentence>"` (with `--supersedes N` / `--retires N` / `--link [[notes/<slug>]]` as needed). Show the returned row id per write - no confirmation prompt.
 
 ### prune
-Full sweep of both homes for the current project: delete expired provisionals mechanically (no confirmation), verify each index line's file exists, spot-check file claims naming paths/symbols (Glob/Grep), flag stale `project` files (merged + >30 days), find near-duplicates across homes, check caps. Present one deletion/merge plan for the judgment half, apply on confirm. Team-home deletions are git-visible — safe to apply, user reviews in the diff. **A weekly scheduled distill runs prune over recently-active homes** (cron, established 2026-08-27) — expiry and consolidation must not depend on anyone remembering to ask.
+Full sweep of both homes for the current project: spot-check active rows and notes that name paths/symbols (Glob/Grep) and `memo add --retires N` the dead ones, retire `project` rows whose work merged >30 days ago (verify via `git log`/PR state), find near-duplicate rows (`memo find`) and supersede the weaker, check the `notes/` caps and orphan notes (`memorylint check`); legacy v2 homes additionally lose expired provisionals mechanically. Present one deletion/merge plan for the judgment half, apply on confirm. Team-home deletions are git-visible — safe to apply, user reviews in the diff. **A weekly scheduled distill runs prune over recently-active homes** (cron, established 2026-08-27) — expiry and consolidation must not depend on anyone remembering to ask.
 
 **Deterministic enforcement:** `memorylint` — global Go CLI at `~/.local/bin/memorylint`, shared by Claude Code and Codex hooks; canonical source in toolbox (`~/Work/Projects/acme-org/toolbox/internal/memorylint`, graduated from FixIt). `memorylint check <dir...>` enforces caps, routing schema, lifecycle (provisional ⇒ `expires`; expired ⇒ flagged deletable), index reachability, links, and secret/IP/email hygiene. `fix --dry-run`, `new`, `reindex`, `graph --similar`, `hook` cover migration and authoring. Only narrow fixture values belong in `.memory-lint-allow`. `prune`/`audit` own the judgment half: staleness, supersession, derivability, semantic consolidation.
 

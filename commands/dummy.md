@@ -1,6 +1,6 @@
 ---
 disable-model-invocation: true
-name: dumy
+name: dummy
 argument-hint: "[the point to clarify]"
 description: "Re-explain something from the conversation as if I knew nothing about it."
 ---
