@@ -13,7 +13,7 @@ Never switch a checkout. `git worktree list` → the checkout on `<branch>` is t
 
 ## Triage the dirt — every path into exactly one bucket
 
-`node ~/.claude/lib/git/bin/sync-context.ts --repo <ABS>` (generatedPaths, regenCmd, lockfiles) + `node ~/.claude/lib/git/bin/classify-paths.ts --repo <ABS>` (secrets, artifacts); read the diff of the rest. The repo's CLAUDE.md and `.claude/.claude.git.config` win over built-ins.
+`toolbox gitkit sync-context --repo <ABS>` (generatedPaths, regenCmd, lockfiles) + `toolbox gitkit classify-paths --repo <ABS>` (secrets, artifacts); read the diff of the rest. The repo's CLAUDE.md and `.claude/.claude.git.config` win over built-ins.
 
 - **DISCARD** — `artifacts[]`, `generatedPaths` matches, build/regen output, lockfile churn without manifest change, formatter-only churn, screenshots/reports outside `.vitrinka/`. Tracked → `git -C <ABS> restore -- <paths>`; untracked → delete per path. Never `restore .`, `checkout .`, or `clean` without explicit paths.
 - **IGNORE** — every regenerable untracked DISCARD path → one `.gitignore` proposal: narrowest pattern per group, one-line reason per group, ONE AskUserQuestion; on approval apply + commit `chore(gitignore): …`. A tracked generated file churning every run → report as `git rm --cached` + ignore candidate, never do it unasked.

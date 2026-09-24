@@ -213,7 +213,7 @@ Same family: `for f in $FILES` iterates **once** over the whole string, and
 `$(cmd)` unquoted stays a single word. Command substitution capturing a
 newline-separated list needs `${(f)"$(cmd)"}` or a `while read` loop.
 
-💡 `~/.claude/lib/git/bin/github-io.ts` now detects a whitespace-bearing
+💡 `toolbox gitkit github-io` now detects a whitespace-bearing
 flag name and names this cause outright instead of blaming a missing field.
 
 ## `xcodebuild` hangs at `CreateBuildDescription` — a stale WDA build, not your code

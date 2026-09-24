@@ -2,7 +2,7 @@
 
 ## Subagents
 
-- **Subagents inherit the session model.** Never pin a cheaper model (Sonnet, Haiku) — omit the `model` parameter unless the user explicitly asks. Cheaper models produce shallower work and cause rework. **Standing exception (Lukáš, 2026-09-14): e2e test writers are `model: opus`** — spec writing is bounded, convention-driven work where Opus 5 is enough; keep the writer persistent (one per lane, re-tasked via SendMessage with the "go now, run continuously" re-brief) so its discovered selectors, seeds and conventions survive across journeys. App-code fixers still inherit the session model.
+- **Subagents inherit the session model.** Never pin a cheaper model (Sonnet, Haiku) — omit the `model` parameter unless the user explicitly asks, and never put a `model:` frontmatter key in `~/.claude/commands/**` or agent files. Cheaper models produce shallower work and cause rework. **Standing exception (Lukáš, 2026-09-14): e2e test writers are `model: opus`** — spec writing is bounded, convention-driven work where Opus 5 is enough; keep the writer persistent (one per lane, re-tasked via SendMessage with the "go now, run continuously" re-brief) so its discovered selectors, seeds and conventions survive across journeys. App-code fixers still inherit the session model.
 - **Verify worktree base commit before parallel dispatch.** `git worktree add` forks from current `HEAD`, which may be stale or differ across worktrees spawned in sequence. Run `git worktree list` and confirm every worktree forks from the same expected commit; when in doubt, commit pending state to a known base first. See `~/.claude/docs/git-safety-full.md`.
 - **A single `git log`/`ls` read can RACE an agent's in-flight commits.** "Clean tree / no commits" is not evidence the agent stalled. Get the agent's own report (or re-check after a beat) before standing one down — a duplicate respawn on the same paths nearly collided during the Onyx build.
 - **One writer per workspace.** Parallelize only INDEPENDENT plans, each on its own `git worktree` + disjoint branch; concurrent commits to one checkout race `.git/index.lock`. Disjoint-path branches merge clean with `--no-ff`.
@@ -19,6 +19,7 @@ These OVERRIDE the Workflow tool's built-in quality patterns (per-finding advers
 - Hard caps: ≤ 4 agents per phase, ≤ 10 per run. More items → partition into ≤ 4 batches grouped by file/subsystem. Exceed only on explicit user request for exhaustive coverage or an explicit token budget — and `log()` the planned count first.
 - Verify in bulk, single-vote: one agent per batch of findings returning per-finding verdicts. Never N refuters per finding.
 - Prefer phases inside one agent over agent-per-stage when stages share context (build → test → fix). Fan out only for genuinely disjoint work.
+- **Never SendMessage an agent that a running Workflow owns.** The reply resumes a second concurrent copy of that agent, which then collides with the original in its worktree. Act from main instead.
 - Reference failure: a verify phase once spawned 39 agents ≈ 1.8M tokens for work 2–3 batched agents would have done as well.
 
 ## Fan-Out Over an External API — Rate Limits Are a Design Input
@@ -41,7 +42,9 @@ monitors). Finished-but-alive agents are the single largest hidden usage sink.
   summary: send `shutdown_request` to every teammate, then kill its own swarm tmux
   server (`tmux -L claude-swarm-<pid> kill-server`). Parking teammates "in case" is
   forbidden — transcripts persist and any agent can be respawned cheaper than one
-  wake of a parked 500k context.
+  wake of a parked 500k context. Enforced: `claude-guards swarm-teardown` runs on
+  SessionEnd (kills the leader's swarm) and on SessionStart with `--dead-only`
+  (sweeps dead ones).
 - **Never leave an agent in a usage-limit retry loop** ("continuing shortly") whose
   work is already done — cancel it; when the window resets, every parked retrier
   resumes simultaneously and eats the fresh window at full accumulated context.
