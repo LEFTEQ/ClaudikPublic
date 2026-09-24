@@ -51,7 +51,12 @@ on the keep-list.
   positives destroy work; false negatives just leave a branch lying around.
 - **Merge probe** (unmerged only, git ≥ 2.38; older → `probe n/a`):
   `git merge-tree --write-tree "$DEFAULT" "$BRANCH"` (read-only). Exit 0 →
-  `MERGEABLE`; exit 1 → `CONFLICTS ×N` (count `CONFLICT` lines). Record
+  `MERGEABLE` — unless the printed tree equals `git rev-parse "$DEFAULT^{tree}"`:
+  merging adds zero lines, the work already landed under other commits (a sibling
+  PR re-committed it) → `DELETABLE (content on $DEFAULT)`, same `-D` right as a
+  squash; never offer a merge that opens an empty PR (2026-09-24, FixIt
+  `work/session-159-invite` shipped in #1609). Exit 1 → `CONFLICTS ×N` (count
+  `CONFLICT` lines). Record
   `git rev-list --left-right --count "$DEFAULT...$BRANCH"` for the report.
 - **PR state** (skip if `gh auth status` fails — note it; local detection still works):
   `gh pr list --head "$BRANCH" --state all --limit 5 --json number,state,title,url,mergedAt`.
