@@ -114,8 +114,11 @@ aged() {  # label, path  -> "<total> total | <old> reclaimable (>${KEEP_DAYS}d) 
   [ -d "$dir" ] || return
   tot="$(du -sm "$dir" 2>/dev/null | cut -f1)"; tot="${tot:-0}"
   [ "$tot" -ge 512 ] || return
+  # xargs splits a big file list into several du batches, each with its own
+  # "total" line: sum them all (tail -1 kept only the last batch, under-reporting
+  # an 8.4G aged slice as 1.8G).
   old="$(find "$dir" -type f -mtime +"${KEEP_DAYS}" -print0 2>/dev/null \
-        | xargs -0 du -cm 2>/dev/null | tail -1 | cut -f1)"; old="${old:-0}"
+        | xargs -0 du -cm 2>/dev/null | awk '$2 == "total" { s += $1 } END { print s + 0 }')"
   printf '%-26s %5s MB total | %5s MB reclaimable (>%sd) | %5s MB KEPT\n' \
     "$label" "$tot" "$old" "$KEEP_DAYS" "$((tot - old))"
   printf '      %s\n' "$dir"

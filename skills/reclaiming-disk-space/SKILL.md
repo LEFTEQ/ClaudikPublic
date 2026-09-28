@@ -29,7 +29,7 @@ fast and costs an iCloud re-fetch to rebuild.
 
 | Mode | Invocation | What it does |
 |---|---|---|
-| **fast** | `reclaim` (the tools repo applet; `--until 100G`, `--tier N`, `--dry-run`, `--list`) | EMERGENCY. No scan, no prompt: a fixed ladder of regenerating caches deleted biggest-first, steps in a tier run concurrently, df printed after every step so wins land while slow steps (Docker prune) still run; `--until` stops as soon as enough is free. Tier 1 build/package caches (go-build, Docker build cache + images, bun, npm, DerivedData, gradle…) · 2 tool/app caches · 3 aggressive-but-reversible (DeviceSupport, device-less sim runtimes, aged Messages/sandbox tmp, Trash). Never volumes, containers, recordings. Ends with by-hand notes. Spec: `toolbox` `docs/reclaim.md`. |
+| **fast** | `reclaim` (the tools repo applet; `--until 100G`, `--tier N`, `--dry-run`, `--list`) | EMERGENCY. No scan, no prompt: a fixed ladder of regenerating caches deleted biggest-first, steps in a tier run concurrently, df printed after every step so wins land while slow steps (Docker prune) still run; `--until` stops as soon as enough is free. Tier 1 build/package caches (go-build, Docker build cache + images, bun tarballs + manifests but never `~/.bun/install/cache/links`, npm, DerivedData, gradle…) · 2 tool/app caches · 3 aggressive-but-reversible (DeviceSupport, device-less sim runtimes, aged Messages/sandbox tmp, Trash). Never volumes, containers, recordings. Ends with by-hand notes. Spec: `toolbox` `docs/reclaim.md`. |
 | **default** | `bash audit.sh` | The audit + confirm-then-delete workflow below. Adds a generic `>1G` giant-file sweep of `~/Library` (finds by size, not by name), screen-recording staging, app-sandbox temp over 1G, the Messages preview cache, and the top log dirs. Also reports device-less iOS runtimes (often 8GB each) and per-sim diagnostics-log stores (~2GB/sim, deletable keeping apps + data). |
 | **deep** | `bash audit.sh deep` | Default audit PLUS a **full `~/Library` pass** ranking every top-level tree (anything big with no row in the sections above is UNCLASSIFIED — drill in by hand); stale `~/Work/Projects` projects (no git activity for 7+ days — reports node_modules/.next/.turbo/dist/Pods/vendor/target sizes) and wt-* worktree volume classification (PR merged via `gh` → reclaimable; 7+ days idle → REVIEW-STALE). Thresholds: `STALE_DAYS`, `KEEP_DAYS` env. May take minutes. |
 
@@ -134,6 +134,7 @@ foreground.
 | Unused sim runtime | `xcrun simctl runtime delete <UUID>` (0-device runtimes from report) | none (re-downloads via Xcode) |
 | Sim log spam | shutdown all, then `rm -rf .../Devices/*/data/var/db/diagnostics/*` | none (logs only; apps + data survive) |
 | Stale project artifacts (deep) | `rm -rf <proj>/node_modules <proj>/.next …` by path from report | low (reinstall on next use) |
+| Stale bun `.bun` entries in a live checkout | `reclaim bun-prune <checkout>` (dry run: unreachable dirs + `.old_modules-*`, sizes), then `--apply` | none: deletes only what nothing resolves to; keeps entries an `ios/Podfile.lock` names, anything under 24 h, and `links/` |
 | Merged wt-* stack (deep) | `docker compose -p <proj> down` then `docker volume rm <vols>` | safe IF MERGED verdict |
 | Docker cache+images | `docker builder prune -af` && `docker image prune -af` | none (re-pull/rebuild) |
 | Orphan stack | `docker compose -p <proj> down` then `docker volume rm <vols>` | safe IF `ORPHAN` (never `MOVED`) |
@@ -177,6 +178,10 @@ means "confirm by hand", never "auto-delete" (trivial 0B ones are suppressed).
 ## Red Flags — STOP
 
 - About to type `prune --volumes` or `prune -a --volumes` → **don't**; delete by name.
+- About to `rm -rf ~/.bun/install/cache` (or anything in `links/`) → **don't**: with
+  `globalStore` every checkout's `node_modules/.bun` symlinks into `links/`, so one
+  wipe dangles them all and the repair is a `bun install` per checkout. Use
+  `reclaim --only bun` (keeps `links/`) or `reclaim bun-prune <checkout>`.
 - Classifying orphans in a shell loop without bash word-splitting → re-run the script.
 - Concluding "freeing space didn't work" within a minute of a Docker prune → wait & re-check.
 - `ORPHAN` on a plain repo-shaped name (`fixit-services`, `acmeback`) → confirm no

@@ -1,6 +1,6 @@
 ---
 name: hotfix-lane
-description: "Use when production needs a fix that main cannot ship — 'hotfix', 'patch the last release', 'fix prod without shipping main', 'branch from the tag', or when a release-lineage hotfix branch (hotfix/<slug>) must be driven to deploy and forward-port. Trunk-based repos only; the repo must carry hotfix.yaml (run `hotfix init` if not)."
+description: "Use when production needs a fix that main cannot ship — 'hotfix', 'patch the last release', 'fix prod without shipping main', 'branch from the tag' — or when a hotfix/<slug> branch must be driven to deploy and forward-port. Trunk-based repos only."
 ---
 
 # hotfix-lane

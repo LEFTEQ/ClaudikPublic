@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: tidy
-description: User wants leftovers resolved ("clean up branches", "tidy this repo", "what's still hanging around", "delete the merged branches") — audit branches + worktrees + compose stacks, then resolve each item — merge the mergeable, delete the provably merged (local AND remote), tear down orphan stacks.
+description: "Resolve leftovers: audit branches, worktrees and compose stacks, then merge, delete or tear down each."
 argument-hint: "[slug|all] [--dry-run]"
 ---
 
@@ -157,7 +157,7 @@ the batch and is reported, never acted on with older evidence.
    often someone else's. Non-dev holders remaining → skip that item, report
    `pid + command`, move on. Blocked is the safe outcome.
 2. **Project-native teardown wins.** Repo declares one (`AFTER_MERGE_CMD` in
-   `.claude/.claude.git.config` — see `~/.claude/skills/prm/references/merge.md` —
+   `.claude/.claude.git.config` — see `~/.claude/skills/prm/references/config.md` —
    or a `worktree:cleanup` script) → run its dry-run then the real thing.
 3. **Generic fallback.** `docker compose -p wt-<slug> down` — and `wt-<slug>-e2e`,
    the separately-orphaned twin; same for selected ORPHAN stacks. `down -v` ONLY when

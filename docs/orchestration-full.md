@@ -9,7 +9,7 @@
 - **Fresh `Agent` spawns execute from the spawn prompt; `SendMessage` re-tasks are flaky** — a re-tasked background agent often does one turn then idles. Re-brief with "go now, run continuously; your next message is the green gate or a real blocker", and don't answer idle pings individually.
 - **529 throttling** hits with 5–6 concurrent heavy agents. Throttle to batches of 2, or one-agent-per-plan sequential. The main loop's own tool calls don't contend on the subagent inference budget — do small critical edits yourself while agents are throttled.
 - **Freeze the shared interface contract before authoring plans**, then run one consistency-review pass over them: it catches cross-plan contradictions on paper. Ask briefs to surface structural blockers as Option A/B/C rather than thrashing, and record toolchain constraints that execution surfaces as contract amendments.
-- **Memory doctrine lives in `~/.claude/skills/my/memory/SKILL.md`** — read it before saving or reorganizing memory. Capture inline at the moment (feedback after corrections, project/reference for non-derivable discoveries); gate every save with "re-derivable in <30 s?" → don't save. `/memory:learn`, `/memory:dream`, `living-docs`, `context-manager`, and `.claude/aix.md` registries are all RETIRED.
+- **Memory doctrine lives in `~/.claude/skills/memory/SKILL.md`** — read it before saving or reorganizing memory. Capture inline at the moment (feedback after corrections, project/reference for non-derivable discoveries); gate every save with "re-derivable in <30 s?" → don't save. `/memory:learn`, `/memory:dream`, `living-docs`, `context-manager`, and `.claude/aix.md` registries are all RETIRED.
 
 ## Workflow / Ultracode — Batch, Don't Atomize
 
@@ -31,20 +31,26 @@ When a command fetches from an external API (GitHub, GitLab, Jira, Linear, Slack
 - Cap concurrency: the secondary "abuse detection" limit trips on burstiness, not volume. ≤6 agents under 20 tasks, 4 for 20–40, 3 above that with each serializing its slice.
 - Preflight `rateLimit.remaining` from the first response (warn under 500) and cache the normalized fetch on disk so a re-run is free.
 
-## Teammates & Long-Lived Sessions — Teardown Discipline
+## Agents & Long-Lived Sessions — Teardown Discipline
 
 Measured 2026-08-26: 64 swarm tmux sockets accumulated in a week, 18 still live, the
 oldest 7 days — every parked teammate re-bills its FULL accumulated context (often
 300–800k tokens) each time anything wakes it (usage-limit auto-retry, goal check-ins,
 monitors). Finished-but-alive agents are the single largest hidden usage sink.
 
-- **A swarm ends when its goal ends.** The lead's LAST action before its final
-  summary: send `shutdown_request` to every teammate, then kill its own swarm tmux
-  server (`tmux -L claude-swarm-<pid> kill-server`). Parking teammates "in case" is
-  forbidden — transcripts persist and any agent can be respawned cheaper than one
-  wake of a parked 500k context. Enforced: `claude-guards swarm-teardown` runs on
-  SessionEnd (kills the leader's swarm) and on SessionStart with `--dead-only`
-  (sweeps dead ones).
+- **Agent teams are off** (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=0` in
+  `~/.claude/settings.json`, 2026-09-26). With them on, every *named* Agent spawn
+  silently became a tmux teammate — the source of the swarms above. Parallel work is
+  subagents and Workflows; a named subagent stays addressable via SendMessage without
+  a swarm. Re-enabling is a per-session opt-in (`claude --settings`), never the
+  global default. `teammateMode: "tmux"` stays so that opt-in needs one flag.
+- **An agent ends when its goal ends.** A persistent named subagent (the e2e writer)
+  is stopped when its loop ends; parking one "in case" is forbidden — transcripts
+  persist and any agent can be respawned cheaper than one wake of a parked 500k
+  context. A session that opted into a team still owes the teardown: `shutdown_request`
+  to every teammate, then `tmux -L claude-swarm-<pid> kill-server`. Enforced for
+  leftovers: `claude-guards swarm-teardown` runs on SessionEnd (the leader's swarm)
+  and on SessionStart with `--dead-only` (dead ones).
 - **Never leave an agent in a usage-limit retry loop** ("continuing shortly") whose
   work is already done — cancel it; when the window resets, every parked retrier
   resumes simultaneously and eats the fresh window at full accumulated context.

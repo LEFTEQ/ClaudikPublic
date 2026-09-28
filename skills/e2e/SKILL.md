@@ -1,6 +1,6 @@
 ---
 name: e2e
-description: "Use when QA-ing or writing end-to-end UI tests — sweeping a git diff/release or a named route/flow — by driving the app live and emitting runner-backed tests (Playwright for web, Appium/WebdriverIO for Expo/React Native). Runs autopilot end-to-end and commits."
+description: "Use when QA-ing or writing end-to-end UI tests for a web app (Playwright) or an Expo/React Native app (Appium/WebdriverIO) — sweeping a git diff or release, or a named route or flow."
 ---
 
 # /e2e — discover → journey → test

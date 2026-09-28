@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: where-file
-description: User asks where a file is, or you named a file they're meant to open but gave no clickable path — print the absolute path of the file(s) that actually matter.
+description: "Print the absolute path of the file(s) that matter."
 ---
 
 Print the absolute path of the file(s) the user is meant to open — not an

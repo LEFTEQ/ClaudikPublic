@@ -1,6 +1,6 @@
 ---
 name: whats-next
-description: "Use when explicitly invoked as `/whats-next` to explain the current blocker and choose concrete next steps."
+description: "Explain the current blocker and choose concrete next steps."
 disable-model-invocation: true
 ---
 

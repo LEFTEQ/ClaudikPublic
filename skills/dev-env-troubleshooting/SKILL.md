@@ -300,8 +300,8 @@ ACTUALLY emits — bun prints `(no changes)` / `Saved lockfile`, not `done`.
 
 **Diagnose this BEFORE the server-side outage runbook.**
 
-**Symptom:** a host (e.g. the devops VPS `203.0.113.10`) is dead from your Mac
-on *all* ports **and** ICMP, yet another host in the same datacenter (prod
+**Symptom:** a host (e.g. the devops VPS `203.0.113.60`) is dead from your Mac
+on *all* ports **and** ICMP, yet another Hetzner host (the web VPS
 `203.0.113.20`) and the public internet work fine, AND the box is reachable
 from elsewhere (e.g. from prod). **When ONLY your Mac can't reach it, suspect
 local routing — not fail2ban / netplan / kernel.**

@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: recommend
-description: "User asks what you'd recommend / what the options are — stop working and hand back a decision brief: real options with costs, one named recommendation, one next step."
+description: "Decision brief: real options with costs, one recommendation, one next step."
 ---
 
 The user is deciding, not delegating. Stop implementing.

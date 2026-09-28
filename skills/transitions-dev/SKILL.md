@@ -1,6 +1,6 @@
 ---
 name: transitions-dev
-description: Production-ready CSS transitions for web UI — dropdowns, modals, panels, page slides, toasts, tooltips, tabs, accordions, toggles, checkboxes, badges, skeleton/shimmer loaders, icon/text swaps, number pop-ins and counters, hover tilt, error shakes, success checks, AI-thinking and streaming text, dot loaders, banner stacks. Use when adding or animating any UI transition, tokenizing ad-hoc animations into motion tokens, or on the transitions reveal/review/apply/refine commands.
+description: "Use when adding or animating any web UI transition — dropdowns, modals, panels, page slides, toasts, tooltips, tabs, accordions, toggles, checkboxes, badges, skeleton/shimmer loaders, icon/text swaps, number pop-ins and counters, hover tilt, error shakes, success checks, AI-thinking and streaming text, dot loaders, banner stacks — when tokenizing ad-hoc animations into motion tokens, or on the transitions reveal/review/apply/refine commands."
 ---
 
 # Transitions.dev

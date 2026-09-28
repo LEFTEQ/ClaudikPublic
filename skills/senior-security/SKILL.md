@@ -1,6 +1,6 @@
 ---
 name: senior-security
-description: "Security engineering: appsec review, threat modeling, penetration testing, security architecture, crypto implementation, compliance auditing. Use when designing or reviewing security architecture, conducting a pentest, implementing cryptography, or performing a security audit."
+description: "Use when designing or reviewing security architecture, threat modeling, running a pentest or appsec review, implementing cryptography, or performing a security or compliance audit."
 ---
 
 # Senior Security

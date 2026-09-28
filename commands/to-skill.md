@@ -20,7 +20,7 @@ Settle at minimum:
 
 - **Auto-invocable or manual-only?** Decides the frontmatter (step 4).
 - **Structure:** one lean SKILL.md, or SKILL.md + references/ loaded per-phase (SKILL.md orchestrates, references carry the bulk, one level deep)? Scripts for the deterministic parts?
-- **Front door:** thin command stub in `~/.claude/commands/<name>.md`? Required if the skill dir can't be top-level — nested `skills/my|me/*` never register; stub Reads the SKILL.md by absolute path.
+- **Location:** flat `~/.claude/skills/<name>/` only — a nested dir never registers, and no command stub is ever placed in front of a skill (manual-only is the frontmatter flag, not a stub).
 - **Name:** kebab, collision-checked against existing skills AND commands.
 
 ## 4. Draft under doctrine
@@ -31,4 +31,4 @@ Then run the reviewer loop from `~/.claude/commands/distill.md` (Flow step 2) on
 
 ## 5. Confirm, scaffold, deliver
 
-Show the full SKILL.md + directory tree (each planned reference/script with a one-line purpose) + token count. AskUserQuestion: **Approve** / **Tweak** / **another /qna round**. Never scaffold unconfirmed. On approve: create `~/.claude/skills/<name>/` (+ references, scripts, command stub as chosen). Deliver the file tree, invocation(s), one concrete moment a session would reach for it, and that a fresh session registers it.
+Show the full SKILL.md + directory tree (each planned reference/script with a one-line purpose) + token count. AskUserQuestion: **Approve** / **Tweak** / **another /qna round**. Never scaffold unconfirmed. On approve: create `~/.claude/skills/<name>/` (+ references, scripts). Deliver the file tree, invocation(s), one concrete moment a session would reach for it, and that a fresh session registers it.

@@ -1,6 +1,6 @@
 ---
 name: diagnosing-bugs
-description: Diagnosis loop for hard bugs and performance regressions — anything where the cause isn't visible after a first look. Use when the user says "diagnose"/"debug this", reports wrong output, intermittent failures, or something slow, and the fix isn't obvious. NOT for dev-environment/tooling failures (EPERM, unreachable hosts, CLI weirdness) — that's dev-env-troubleshooting.
+description: "Use when the user says 'diagnose' or 'debug this', reports wrong output, intermittent failures or something slow, and the cause isn't visible after a first look. NOT for dev-environment/tooling failures (EPERM, unreachable hosts, CLI weirdness) — that's dev-env-troubleshooting."
 ---
 
 # Diagnosing Bugs

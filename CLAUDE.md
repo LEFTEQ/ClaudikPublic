@@ -42,7 +42,7 @@ These apply even with bypass permissions. `~/.claude/hooks/claude-guards` (Go bi
 Skills auto-trigger on intent (their descriptions load every session — don't duplicate them here). These pointers cover surfaces with no auto-trigger:
 
 - Git/GitHub command conventions (bare names, PRs open ready-for-review never draft, `.claude/config` system) → `~/.claude/docs/git-commands.md`.
-- **Memory routing**: the personal home (`~/.claude/projects/<slug>/memory/`) holds ONLY `user`/`feedback` types. `project`/`reference` memories go to `<repo>/.claude/memory/` (committed team home; create dir + MEMORY.md if missing, run a secrets check before writing). Full doctrine + saving/organizing → `~/.claude/skills/my/memory/SKILL.md` (nested dir — invisible to the Skill tool; Read it by path).
+- **Memory routing**: the personal home (`~/.claude/projects/<slug>/memory/`) holds ONLY `user`/`feedback` types. `project`/`reference` memories go to `<repo>/.claude/memory/` (committed team home; create dir + MEMORY.md if missing, run a secrets check before writing). Full doctrine + saving/organizing → `~/.claude/skills/memory/SKILL.md` (Read it by path).
 - Verification reflexes, worktree base-commit checks → `~/.claude/docs/orchestration-full.md`.
 - **Deliverable outputs** (docs, exports, AI-produced files, press artifacts) belong in one dedicated deliverables home, project-first `<Project>/<kind>/`. Never write deliverables to ad-hoc directories.
 - **Backups** (git bundles, DB dumps, pre-rewrite mirrors, config snapshots — anything big/binary kept as insurance) go to a local-only backups home, NEVER in git and never in the deliverables home.

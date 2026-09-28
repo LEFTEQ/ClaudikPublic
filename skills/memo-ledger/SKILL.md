@@ -1,5 +1,5 @@
 ---
-name: memo
+name: memo-ledger
 description: "Use whenever a session learns a durable fact (a user preference, a correction, a trap, a project rule), acts on a remembered one, or needs to look one up - 'remember this', 'note for next time', 'what did we decide about X', a MEMORY.md row cited as #NN, or any write to a memory home's LEDGER.md / MEMORY.md / usage.jsonl."
 ---
 

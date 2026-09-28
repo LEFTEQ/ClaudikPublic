@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 name: fresh-session
-description: "User wants to continue this work in a fresh session — compose a ready-to-paste initial prompt."
+description: "Compose a ready-to-paste prompt to continue this work in a fresh session."
 ---
 
 Compose the initial prompt for a fresh session that continues this one's work. Scope from $ARGUMENTS if given (one thread of the session), else the session's main thread. The deliverable is PROMPT TEXT in one fenced code block the user copies — not a file (a resumable, gated handoff is /handoff). Write it for a Claude with ZERO context — no session shorthand, no "as discussed".
