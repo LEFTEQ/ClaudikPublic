@@ -11,6 +11,15 @@ description: "Use when QA-ing or writing end-to-end UI tests for a web app (Play
 
 **Lean by construction.** Durable output is the `*.spec.ts` files + one committed `journeys.md` per app. `/e2e` **never** writes an `.ai-testing/` tree, blueprints, cookbook, inventory, memory chunks, or baselines. The specs are the memory; staleness shows up as a failing test.
 
+## Who runs it
+
+- **Read by Claude Code — you are the orchestrator:** the sole app-code editor (Phase 3) and the sole committer. Phases 1, 2 and the Phase 4 report run on the **Codex sidekick** (`codex-sidekick` skill): start the lead with `switcheroo codex run` (Bash, `run_in_background: true`), brief = scope + flags, and keep that one thread for the e2e lane — every later turn (next feature, re-run after a fix, resume after `blocked`) is `switcheroo codex run --resume <run-id> -`, never a fresh run. A live run IS a live fan-out: no app-code edits, no driving its browser. Exit 10 (`blocked`) = a hardStop, an ASK FIRST halt or a missing test dependency → handle it (Phase 3 / Autonomy / install it), then resume. Exit 3 (no Codex account), or the sidekick not installed (`switcheroo codex run --help` fails, no `codex-sidekick` skill) → lead the pipeline yourself on the Opus fallback (Phase 2) and say so.
+- **Read by Codex — you are the sidekick and the pipeline lead:**
+  - Discovery fans out via `sol_explorer`; each lane is one persistent `sol_tester`, and both lanes are serial — mobile has one simulator, web one browser (every MCP server in your run binds the run's onyx session from `ONYX_MCP_SESSION` at start, so a second web tester would drive the same tabs; ignore `concurrency.web`).
+  - Never edit app source, never commit: every "commit" and every Phase 3 step below is the orchestrator's — leave files uncommitted and list them in `files_written`. "Install missing test deps" is the orchestrator's too: `package.json` and lockfiles are not test files, so a missing test dependency ends the turn `"blocked"`, naming the package.
+  - A hardStop or an ASK FIRST halt ends the turn with status `"blocked"` and `blocker` filled; you are resumed after the fix. Under `--no-fix` a hardStop instead marks that lane's queue `blocked: hardstop-<slug>` and becomes a finding; the other lane goes on and the turn ends `"done"`.
+  - Map the writer return onto the result schema: each `deferredFix` → a finding (severity ≥ `major`, title `deferred: <slug>`, detail = its `fixHint` + the `.fixme()` spec path, `files` = the app files to fix); `specsWritten` → `tests.written`; `journeysVerified` counts → `summary`; the first hardStop → `blocker`, any further one → a `blocker`-severity finding.
+
 ## Autonomy — autopilot is the default
 
 You were invoked; the user already said yes. Run the whole pipeline (discover → journey → drive → fix → report → commit) **end-to-end, no check-ins**. Never send "shall I proceed / let me know if / before I move on" mid-run; resolve it or record a finding and keep going. Fabricating a missing input is never "resolving" it.
@@ -46,6 +55,7 @@ Bare `/e2e` = full pipeline on `git diff <base>..HEAD`. Route on the first arg /
 | `/e2e --release <tag>` · `--since <sha>` | scope = diff vs that ref |
 | `--discover` | run Phase 1 only → write `journeys.md`, stop (no device) |
 | `--write` | skip Phase 1; drive + emit from the existing `journeys.md` — **requires** it to exist; if missing, STOP and say to run `/e2e --discover` first (inline source-derivation IS discovery, forbidden here) |
+| `--no-run` | write/rework specs + `journeys.md` **statically** — from source, testIDs and the existing specs; no boot, no browser/device, **never execute the runner** (the brief's steps 2–4 and run-it-alone are skipped), gated by `ast-lint` + the project's typecheck only. Journeys stay `verified: false` until a full run. The orchestrator's default while app code is still changing; full runs (drive + dual-verify + run-it-alone) at the end of the work, or when the orchestrator asks for one on a risky change |
 | `--no-fix` | author only; skip Phase 3 (the fix pass) |
 | `--no-commit` | leave everything uncommitted |
 | `--web` · `--mobile` | restrict to one stack |
@@ -77,7 +87,7 @@ Read `.e2e.json` from the repo root (or the app dir in a monorepo). It carries e
 
 1. **Resolve scope** → a file list. For a diff, `git diff <base>..HEAD --name-only`, filter to app code.
 2. **Cluster into features.** Group by feature directory; **merge** an api segment with a client segment when their slugs overlap >50% (e.g. `apps/api/comments` + `apps/client/screens/comments` → one cluster). Topo-sort by dependency.
-3. **Fan out one discovery subagent per cluster** (parallel — these are static, so no device contention). Dispatch each as a `Task` (general-purpose) with this brief:
+3. **Fan out one discovery subagent per cluster** (parallel — these are static, so no device contention). Dispatch each — a `sol_explorer` on the sidekick, a `Task` (general-purpose) on the Opus fallback — with this brief:
 
    > Static analysis only — **do not** launch any device/browser/MCP. For cluster `<files>`: read the router + source and return JSON `{routes[], actions[], intents[], journeys[], testidGaps[], conflicts[]}`.
    > - **routes**: every screen/route the cluster reaches (Expo Router `app/`, Next `app/`/`pages/`, React Router, React Navigation).
@@ -106,18 +116,18 @@ Under `--discover`, stop here (write `journeys.md`, no commit unless asked). Oth
 ## Phase 2 — Emit + Drive (live, fan-out)
 
 **Lane scheduler — the entire concurrency model:**
-- **web** writers run in parallel up to `concurrency.web` (Playwright always `--isolated`).
+- **web** writers run in parallel up to `concurrency.web` (Playwright always `--isolated`) — on the Opus fallback; on the sidekick the web lane is 1 (one browser per run, see **Who runs it**).
 - **mobile** writers share **one** Appium simulator → semaphore of 1 (serial lane). This cap of 1 is **skill-enforced, not config**: ignore any `.e2e.json` `concurrency.mobile > 1` and never boot a second simulator — two Appium sessions on one device corrupt state. Non-negotiable regardless of urgency.
 - **app-code edits** are a semaphore of 1 held **only by the orchestrator** (Phase 3). Writers never acquire it.
 
-**One persistent writer per lane, `model: opus`** (the sanctioned cheaper-model exception — Opus 5 is enough for spec writing). Spawn `concurrency.web` web writers and one mobile writer as named `Agent`s (general-purpose, `model: "opus"`), brief each once with the brief below plus its first feature, then hand it every further feature on its lane via `SendMessage` ("go now, run continuously; your next message is the feature's return or a real blocker") — never a fresh spawn per feature, so discovered selectors, seeds and conventions carry over. Shut every writer down when Phase 2 ends. The brief:
+**One persistent writer per lane, on the sidekick.** The Codex lead runs one web lane and one mobile lane, each a persistent `sol_tester`: brief it once with the brief below plus its first feature, then hand it every further feature on its lane — never a fresh tester per feature, so discovered selectors, seeds and conventions carry over; the orchestrator continues the lead thread itself with `--resume` (see **Who runs it**). **Opus fallback — only when `switcheroo codex run` exits 3** (no Codex account) **or isn't installed** (`--help` fails, no `codex-sidekick` skill): spawn the writers as named `Agent`s (general-purpose, `model: "opus"`, the sanctioned cheaper-model exception), hand each further feature via `SendMessage` ("go now, run continuously; your next message is the feature's return or a real blocker"), shut every writer down when Phase 2 ends. The brief:
 
 > Own this feature's journeys end-to-end. **You may NOT edit app source — only drive and write specs.**
 > 1. Detect stack from `.e2e.json.stacks`. Web → Playwright MCP (`--isolated`, `references/playwright-driver.md`). Mobile → Appium/WDIO (`references/appium-driver.md`: dev-client/Metro reachability, E2E reset+seed **before** first navigation, `~testID` selectors).
 > 2. Boot + login per `.e2e.json`. Reset/seed deterministic state first.
 > 3. Before driving, confirm the journey's entry route still exists in source — a journey pointing at a deleted/renamed route is a `staleJourney` finding, not driven (a 404 / catch-all render is never a passing navigation). Then walk each step **text-mode-first** (a11y tree / page-source / `browser_network_requests`; screenshots only as evidence via `references/snap.sh`).
 > 4. **Dual-verify every mutation** (follow the **Dual-verify** traps above): client half (UI state changed) **and** server half (`apiVerify.log` tail / `inspect` / a `server-state` assertion shows the mutation landed). A green UI over a silent 5xx is a **failure**.
-> 5. Emit one spec per journey using `references/assertions.md` templates → run `node bin/ast-lint.mjs <spec> <cfg>` → fix lint violations (a missing/fragile testID is a finding for the orchestrator, NOT an edit the writer makes — emit `.fixme()` + the add-testid note) → **run-it-alone** (`--grep @e2e-<slug> --workers=1` / WDIO `--spec … --mochaOpts.grep`). GREEN → keep.
+> 5. Emit one spec per journey using `references/assertions.md` templates → run `node bin/ast-lint.mjs <spec> <cfg>` → fix lint violations (a missing/fragile testID is a finding for the orchestrator, NOT an edit the writer makes — emit `.fixme()` + the add-testid note) → **run-it-alone** (`--grep @e2e-<slug> --workers=1` / WDIO `--spec … --mochaOpts.grep`) — under `--no-run` (static: steps 2–4 skipped too), the project's typecheck instead, never the runner. GREEN → keep.
 > 6. **On a real bug** (journey fails for an app reason): record a finding `{slug, step, expected, actual, evidence, stack, fixHint, files}` and emit the spec as `.fixme()`. **Do not fix.** A failing mutation (4xx/5xx) on the journey's own endpoint is ALWAYS a per-journey deferred bug here (record + `.fixme()` + continue), never a hard-stop — a 5xx doesn't stop *driving*, so it never quiesces the fan-out.
 > 7. **On a hard-stop** — ANY failure that leaves the device/process unusable for later journeys on the same lane (app won't boot, login broken, or any app-process death: white-screen + Metro render error, native crash, frozen bundle, wedged simulator): stop and return `hardStop: {reason, files, fixHint}` immediately. Do NOT downgrade a process-killing crash to a step-6 `.fixme()` and drive on — the next queued journey on a serial lane can't get a clean app.
 > Return `{journeysVerified[], specsWritten[], findings[], deferredFixes[], hardStops[]}`.
@@ -128,12 +138,12 @@ Update each journey's `verified:` line + `spec:` path in `journeys.md` from the 
 
 The orchestrator is the **sole app-code editor** — so fixing never collides with the parallel writers.
 
-- **Hard-stop, mid-flight:** when a writer returns a `hardStop`, **quiesce all lanes** (let in-flight writers finish their current step, pause the rest) and **confirm every lane is paused/returned before editing any app source** (a writer re-reading half-applied code is nondeterministic), apply the fix, re-verify the blocked journey, then **resume** the fan-out. Apply the same ≤5-file/≤100-LOC budget as deferred fixes; if the fix exceeds budget or fails once, record the hardStop as a deferred finding, mark it and every journey queued behind it on that lane `blocked: hardstop-<slug>`, and continue with untouched lanes. Under `--no-fix`, a hardStop still quiesces the affected lane — never drive a queued journey into a known-dead app; mark them blocked and report.
-- **Deferred bugs, after all writing completes:** for each `deferredFix`, apply it — inline if small (≤5 files / ≤100 LOC), else dispatch ONE `general-purpose` Task subagent (serial, never concurrent) — then re-run that spec. GREEN → un-`.fixme()`, keep, mark the journey `verified: true`. RED → `git restore` the fix, leave `.fixme()`, record it for the report. Never retry a failed fix more than once.
+- **Hard-stop, mid-flight:** when a writer returns a `hardStop`, **quiesce all lanes** (let in-flight writers finish their current step, pause the rest; on the sidekick the lead does this and ends the turn `blocked` — a returned run is a quiesced fan-out, and its resume is a `--resume` turn naming the fix and the journey to re-verify) and **confirm every lane is paused/returned before editing any app source** (a writer re-reading half-applied code is nondeterministic), apply the fix, re-verify the blocked journey, then **resume** the fan-out. Apply the same ≤5-file/≤100-LOC budget as deferred fixes; if the fix exceeds budget or fails once, record the hardStop as a deferred finding, mark it and every journey queued behind it on that lane `blocked: hardstop-<slug>`, and continue with untouched lanes. Under `--no-fix`, a hardStop still quiesces the affected lane — never drive a queued journey into a known-dead app; mark them blocked and report.
+- **Deferred bugs, after all writing completes:** for each `deferredFix` (on the sidekick: each `deferred:` finding), apply it — inline if small (≤5 files / ≤100 LOC), else dispatch ONE `general-purpose` Task subagent (serial, never concurrent) — then re-run that spec (a `--resume` turn on the sidekick thread). GREEN → un-`.fixme()`, keep, mark the journey `verified: true`. RED → `git restore` the fix, leave `.fixme()`, record it for the report. Never retry a failed fix more than once.
 
 ## Phase 4 — Report + commit
 
-Consolidate: journeys verified, specs written, bugs found / fixed / deferred, **backend-silent findings** (the dual-verify catches). Commit locally — `*.spec.ts` + `journeys.md` + verified fixes — as Conventional Commits. **Never push.** Skipped with `--no-commit`.
+Consolidate: journeys verified, specs written, bugs found / fixed / deferred, **backend-silent findings** (the dual-verify catches). On the sidekick the report is its structured result plus `~/Exports/<Project>/codex/<date>-<slug>/findings.md`; it leaves every file uncommitted and lists it in `files_written`. The orchestrator commits locally — `*.spec.ts` + `journeys.md` + verified fixes, path-scoped — as Conventional Commits, and the Exports run dir in `~/Exports`. **Never push.** Skipped with `--no-commit`.
 
 ## Folded-in checks (not separate files)
 
@@ -143,7 +153,7 @@ Consolidate: journeys verified, specs written, bugs found / fixed / deferred, **
 
 ## Files map
 
-**Writes:** `*.spec.ts` (each stack's `specDir`), one `<app>/journeys.md`, `.e2e.json` (first run), `.e2e/.screenshots/` (scratch, gitignore it). **Never writes:** any `.ai-testing/` tree, `blueprints/`, `cookbook/`, `test-inventory.json`, `memory/`, `baselines/`, per-session dirs.
+**Writes:** `*.spec.ts` (each stack's `specDir`), one `<app>/journeys.md`, `.e2e.json` (first run), `.e2e/.screenshots/` (scratch, gitignore it); a sidekick run adds its report dir `~/Exports/<Project>/codex/<date>-<slug>/`, outside the repo. **Never writes:** any `.ai-testing/` tree, `blueprints/`, `cookbook/`, `test-inventory.json`, `memory/`, `baselines/`, per-session dirs.
 
 ## Don't
 

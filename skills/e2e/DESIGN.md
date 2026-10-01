@@ -44,7 +44,7 @@ One discipline underneath everything: **dual verification** — a journey passes
 1. Exhaustive "burn the budget" sweeping. `/e2e` stops when the declared scope is journeyed + tested, not when context runs out.
 2. Mutation testing, visual-regression diffing, i18n/design-token drift audits — deferred to CI / dedicated skills.
 3. Cross-session "muscle-memory" caches (blueprints / cookbook / memory chunks). The specs + `journeys.md` are the memory.
-4. A formal wire-contract / gate ledger. The orchestrator branches on a plain structured envelope and trusts an Opus subagent to be thorough.
+4. A formal wire-contract / gate ledger. The orchestrator branches on a plain structured envelope and trusts the pipeline lead (the Codex sidekick; an Opus subagent on its fallback) to be thorough.
 
 ## 4. Locked decisions
 
@@ -66,9 +66,9 @@ Each row is a brainstorm decision and the reasoning behind it.
 
 | Piece | What it is | Notes |
 |---|---|---|
-| **`/e2e` (SKILL.md)** | Orchestrator, ~150–250 lines | Owns: arg routing, scope resolution, the lane scheduler, the merge into `journeys.md`, the serial fix pass, the report + local commit. The **only** thing that edits app code. |
-| **discovery subagent** | Inline `Task` prompt, fanned out per feature cluster | Static only (no device). Reads router/source → returns `{routes, actions, intents, draft-journeys, testid-gaps, conflicts}`. Orchestrator merges all into `journeys.md`. |
-| **writer subagent** | Inline `Task` prompt, fanned out per feature | Drives live, dual-verifies, emits one spec per journey. Web parallel / mobile serial. **Never fixes.** Returns `{journeys-verified, specs-written, findings, deferred-fixes, hard-stops}`. |
+| **`/e2e` (SKILL.md)** | Orchestrator, ~150–250 lines | Owns: arg routing, scope resolution, the serial fix pass, the local commit; the lane scheduler, the merge into `journeys.md` and the report run on the Codex sidekick (the pipeline lead) under Claude Code. The **only** thing that edits app code. |
+| **discovery subagent** | Inline prompt — a `sol_explorer` on the sidekick (`Task` on the Opus fallback), fanned out per feature cluster | Static only (no device). Reads router/source → returns `{routes, actions, intents, draft-journeys, testid-gaps, conflicts}`. Orchestrator merges all into `journeys.md`. |
+| **writer subagent** | Inline prompt — one persistent `sol_tester` per lane on the sidekick (a named Opus `Agent` on the fallback), fed feature by feature | Drives live, dual-verifies, emits one spec per journey. Web parallel on the Opus fallback, serial on the sidekick (one browser per Codex run); mobile serial. **Never fixes.** Returns `{journeys-verified, specs-written, findings, deferred-fixes, hard-stops}`. |
 
 No separate agent-registry files, no versioned contract — the subagents return a plain structured envelope the orchestrator branches on.
 
@@ -219,7 +219,7 @@ Bare `/e2e` = full pipeline on the git diff. Routes on the first arg / flags.
 ## 10. Honest losses (tradeoffs of going lean)
 
 - **No cross-session per-screen muscle memory** (blueprints/nav-map gotchas). `journeys.md` recovers *some*; per-screen selector caches and login shortcuts are re-derived each run (cheap, since discovery is static).
-- **No auditable completeness proof.** The 35-gate ledger is gone; we trust an Opus subagent to cover the scope. Trade: usefulness over provable exhaustiveness.
+- **No auditable completeness proof.** The 35-gate ledger is gone; we trust the pipeline lead (the Codex sidekick; an Opus subagent on fallback) to cover the scope. Trade: usefulness over provable exhaustiveness.
 - **Bug classes this tool no longer catches:** weak assertions a mutation test would expose, pixel/layout regressions, raw-i18n-key leaks, design-token drift. Bet: those belong in CI / dedicated skills.
 - **Fuzzier no-op detection.** glob+grep over existing `*.spec.ts` instead of sha256 `findingSignature` — can occasionally emit a near-duplicate.
 - **Net-new design risk:** stack-native action discovery via the Appium accessibility tree. The old library was DOM-first with mobile bolted on, so there's no recipe to port verbatim — this is the one place we *design* rather than delete, and carries the most implementation risk.
