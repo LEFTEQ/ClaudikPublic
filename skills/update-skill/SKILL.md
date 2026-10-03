@@ -1,13 +1,13 @@
 ---
 name: update-skill
-description: "Use when a skill's or slash command's instructions caused, permitted or nearly permitted a failure this session, or the user asks to fix, harden or update a skill or command so it cannot recur — 'the skill told you wrong', 'update the skill', 'fix the command', 'harden X'. A new skill is to-skill; a preference about how to work is update-character."
+description: "Use when a skill or slash command used this session showed a weakpoint — its instructions caused, permitted or nearly permitted a failure, or the work revealed a missing step, stale fact or better path it should carry — or the user asks to fix, harden, refine or update a skill or command — 'the skill told you wrong', 'update the skill', 'fix the command', 'harden X'. A new skill is to-skill; a preference about how to work is update-character."
 ---
 
-Refine instruction surfaces so a failure observed this session cannot recur. `$ARGUMENTS` = skill/command name (bare names resolve against `~/.claude/skills/` and `~/.claude/commands/`, then the current repo's `.claude/`). Empty → find the incident in this session — which surface's instructions caused, permitted, or nearly permitted the failure — propose target + incident one-liner, confirm before proceeding.
+Refine instruction surfaces so a weakpoint observed this session cannot recur. `$ARGUMENTS` = skill/command name (bare names resolve against `~/.claude/skills/` and `~/.claude/commands/`, then the current repo's `.claude/`). Empty → find the weakpoint in this session — which surface's instructions caused, permitted or nearly permitted a failure, or lacked what the work had to learn — propose target + one-liner, confirm before proceeding. Self-raised, it waits until the task at hand is done, never mid-flow.
 
-## 1. Root-cause the incident
+## 1. Root-cause the weakpoint
 
-From session evidence: what happened, the failure CLASS (not the instance), which instruction was wrong, missing, or ambiguous.
+From session evidence: what happened, its CLASS (not the instance), which instruction was wrong, missing, stale or ambiguous.
 
 ## 2. Refine — never append
 
@@ -26,4 +26,4 @@ Search `skills/` + `commands/` for the same failure surface (same command shape 
 
 ## 5. Confirm, write, commit
 
-ONE batched confirmation: incident + root cause, per-file diffs (target, rule home, siblings). AskUserQuestion: approve all / pick files / tweak. Never write unconfirmed. On approve: write, commit path-scoped (`fix(skills): harden <name> — <failure class>`). Skills in a project repo follow that repo's worktree policy.
+ONE batched confirmation: incident + root cause, per-file diffs (target, rule home, siblings). AskUserQuestion: approve all / pick files / tweak. Never write unconfirmed. On approve: write, commit path-scoped (`fix(skills): harden <name> — <weakpoint class>`). Skills in a project repo follow that repo's worktree policy.

@@ -86,11 +86,12 @@ hr
 
 # ---------------------------------------------------------------------------
 # A named-bucket list can only find what it names. This pass finds the rest BY
-# CONSTRUCTION — every file over 1G under ~/Library, whoever owns it. Abandoned
-# screen recordings and app-sandbox temp media live here and are invisible to
-# every allowlist above.
-bold "GIANT FILES IN ~/Library (>1G, any owner)"
-find ~/Library -type f -size +1G -print0 2>/dev/null \
+# CONSTRUCTION — every file over 1G under ~/Library and the per-user temp root,
+# whoever owns it. Abandoned screen recordings, app-sandbox temp media and
+# Instruments raw traces live here and are invisible to every allowlist above.
+TMPROOT="$(getconf DARWIN_USER_TEMP_DIR)"
+bold "GIANT FILES IN ~/Library + \$TMPDIR (>1G, any owner)"
+find ~/Library "$TMPROOT" -type f -size +1G -print0 2>/dev/null \
   | xargs -0 du -h 2>/dev/null | sort -rh | head -20
 hr
 
@@ -242,26 +243,31 @@ if have xcrun; then
 
   # --- Runtimes no device uses (whole disk images, often the single biggest win)
   bold "SIM RUNTIMES WITHOUT DEVICES (disk image deletable via: xcrun simctl runtime delete <UUID>)"
-  RT_JSON="$(mktemp)"; DEV_JSON="$(mktemp)"
+  RT_JSON="$(mktemp)"; DEV_JSON="$(mktemp)"; SDK_JSON="$(mktemp)"
   xcrun simctl runtime list -j >"$RT_JSON" 2>/dev/null
   xcrun simctl list devices -j >"$DEV_JSON" 2>/dev/null
-  python3 - "$RT_JSON" "$DEV_JSON" <<'PY' 2>/dev/null || echo "    (python3/simctl json unavailable)"
+  xcodebuild -showsdks -json >"$SDK_JSON" 2>/dev/null
+  python3 - "$RT_JSON" "$DEV_JSON" "$SDK_JSON" <<'PY' 2>/dev/null || echo "    (python3/simctl json unavailable)"
 import json, sys
 rts = json.load(open(sys.argv[1]))
 devs = json.load(open(sys.argv[2])).get('devices', {})
 counts = {rt: len(ds) for rt, ds in devs.items()}
+# The installed Xcode builds against its own simulator SDK runtime: never offer it.
+xcode = {f"com.apple.platform.{s['platform']} {s['sdkVersion']}" for s in json.load(open(sys.argv[3]))}
 for uuid, info in rts.items():
     ident = info.get('runtimeIdentifier', '')
     n = counts.get(ident, 0)
+    if not ident or f"{info.get('platformIdentifier')} {info.get('version')}" in xcode:
+        continue
     size = info.get('sizeBytes')
     gb = f"{size/1e9:.1f}GB" if size else "?"
     tag = "UNUSED" if n == 0 else f"in use ({n} devices)"
     if n == 0:
         print(f"    UNUSED  {gb:>8}  {info.get('name', ident)}  {uuid}")
-print("    (runtimes with devices are not shown; a UNUSED runtime is safe to delete —")
+print("    (runtimes with devices and Xcode's own SDK runtime are not shown; a UNUSED runtime is safe to delete —")
 print("     it re-downloads via Xcode if ever needed again)")
 PY
-  rm -f "$RT_JSON" "$DEV_JSON"
+  rm -f "$RT_JSON" "$DEV_JSON" "$SDK_JSON"
   hr
 
   # --- Per-sim unified-log stores: pure log spam, deletable WITHOUT losing
@@ -275,12 +281,17 @@ fi
 # ---------------------------------------------------------------------------
 # DEEP MODE — full Library pass + stale Work projects + wt-* volume classification.
 if [ "$MODE" = "deep" ]; then
-  # Rank EVERY top-level Library tree, not a chosen few — this is the pass that
-  # surfaces whole categories nobody thought to name. -type d skips the
-  # GroupContainersAlias symlink, which otherwise double-counts Group Containers.
-  bold "DEEP — FULL ~/Library PASS (every top-level tree, ranked; minutes)"
-  find ~/Library -maxdepth 1 -type d -mindepth 1 -print0 2>/dev/null \
-    | xargs -0 du -sh 2>/dev/null | sort -rh | head -20
+  # Rank EVERY top-level tree of every root, not a chosen few — this is the pass
+  # that surfaces whole categories nobody thought to name. -type d skips symlinks
+  # (GroupContainersAlias would double-count Group Containers). VF/X holds the
+  # browsers' *.code_sign_clone dirs, so it is ranked one level deeper.
+  VF="${TMPROOT%/T/}"
+  bold "DEEP — FULL-DISK PASS (every top-level tree of every root, ranked; minutes)"
+  { find ~ -maxdepth 1 -mindepth 1 -type d ! -path ~/Library ! -path ~/Work -print0
+    find ~/Library ~/Work/Projects "$VF/X" -maxdepth 1 -mindepth 1 -type d -print0
+    find ~/Work "$VF" -maxdepth 1 -mindepth 1 -type d ! -path ~/Work/Projects ! -path "$VF/X" -print0
+    printf '%s\0' /Applications /opt/homebrew
+  } 2>/dev/null | xargs -0 -P 8 -n 1 du -sh 2>/dev/null | sort -rh | head -25
   echo "    Anything big here with no row in the sections above is UNCLASSIFIED —"
   echo "    drill in by hand before deleting; assume user data until proven cache."
   hr

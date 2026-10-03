@@ -16,9 +16,12 @@ name; never blanket-prune.**
 
 The other half is finding it at all. A named-bucket list reports only what it names,
 so the biggest offenders on a real Mac — an abandoned 80G screen recording, 20G+ of
-app-sandbox temp media — stay invisible however often you run it. **Second principle:
-every mode ranks by SIZE generically before it consults any allowlist. Big and
-unclassified means user data until proven otherwise — report it, never script it.**
+app-sandbox temp media, 100G+ of crashed-tool temp — stay invisible however often you
+run it. **Second principle: every scan mode ranks every root by SIZE before it consults
+any allowlist — home (dotdirs included), `~/Library`, `~/Work`, the per-user temp root
+`/private/var/folders/<id>/{T,C,X}` (`getconf DARWIN_USER_TEMP_DIR`), `/Applications`,
+`/opt/homebrew`. Big and unclassified means user data until proven otherwise — report
+it, never script it.**
 
 **Third principle: a warm cache is not garbage.** Media caches (Messages previews,
 app-sandbox temp) are offered only as the slice older than `KEEP_DAYS` (default 60),
@@ -29,12 +32,12 @@ fast and costs an iCloud re-fetch to rebuild.
 
 | Mode | Invocation | What it does |
 |---|---|---|
-| **fast** | `reclaim` (the tools repo applet; `--until 100G`, `--tier N`, `--dry-run`, `--list`) | EMERGENCY. No scan, no prompt: a fixed ladder of regenerating caches deleted biggest-first, steps in a tier run concurrently, df printed after every step so wins land while slow steps (Docker prune) still run; `--until` stops as soon as enough is free. Tier 1 build/package caches (go-build, Docker build cache + images, bun tarballs + manifests but never `~/.bun/install/cache/links`, npm, DerivedData, gradle…) · 2 tool/app caches · 3 aggressive-but-reversible (DeviceSupport, device-less sim runtimes, aged Messages/sandbox tmp, Trash). Never volumes, containers, recordings. Ends with by-hand notes. Spec: `toolbox` `docs/reclaim.md`. |
-| **default** | `bash audit.sh` | The audit + confirm-then-delete workflow below. Adds a generic `>1G` giant-file sweep of `~/Library` (finds by size, not by name), screen-recording staging, app-sandbox temp over 1G, the Messages preview cache, and the top log dirs. Also reports device-less iOS runtimes (often 8GB each) and per-sim diagnostics-log stores (~2GB/sim, deletable keeping apps + data). |
-| **deep** | `bash audit.sh deep` | Default audit PLUS a **full `~/Library` pass** ranking every top-level tree (anything big with no row in the sections above is UNCLASSIFIED — drill in by hand); stale `~/Work/Projects` projects (no git activity for 7+ days — reports node_modules/.next/.turbo/dist/Pods/vendor/target sizes) and wt-* worktree volume classification (PR merged via `gh` → reclaimable; 7+ days idle → REVIEW-STALE). Thresholds: `STALE_DAYS`, `KEEP_DAYS` env. May take minutes. |
+| **fast** | `reclaim` (the tools repo applet; `--until 100G`, `--tier N`, `--dry-run`, `--list`) | EMERGENCY. No scan, no prompt: a fixed ladder of regenerating caches deleted biggest-first, steps in a tier run concurrently, df printed after every step so wins land while slow steps (Docker prune) still run; `--until` stops as soon as enough is free. Tier 1 build/package caches (go-build, Docker build cache + images, bun tarballs + manifests but never `~/.bun/install/cache/links`, npm, DerivedData, gradle…) · 2 tool/app caches + crashed-tool temp (`tmp-instruments`, `tmp-browser-clones`, `tmp-bun`) · 3 aggressive-but-reversible (DeviceSupport, device-less sim runtimes, aged Messages/sandbox tmp, Trash). Never volumes, containers, recordings. Ends with by-hand notes. Spec: `toolbox` `docs/reclaim.md`. |
+| **default** | `bash audit.sh` | The audit + confirm-then-delete workflow below. Adds a generic `>1G` giant-file sweep of `~/Library` + the per-user temp root (finds by size, not by name), screen-recording staging, app-sandbox temp over 1G, the Messages preview cache, and the top log dirs. Also reports device-less iOS runtimes (often 8GB each) and per-sim diagnostics-log stores (~2GB/sim, deletable keeping apps + data). |
+| **deep** | `bash audit.sh deep` | Default audit PLUS a **full-disk pass** ranking every top-level tree of every root in the second principle (anything big with no row in the sections above is UNCLASSIFIED — drill in by hand); stale `~/Work/Projects` projects (no git activity for 7+ days — reports node_modules/.next/.turbo/dist/Pods/vendor/target sizes) and wt-* worktree volume classification (PR merged via `gh` → reclaimable; 7+ days idle → REVIEW-STALE). Thresholds: `STALE_DAYS`, `KEEP_DAYS` env. May take minutes. |
 
 When invoked with an argument (`/reclaiming-disk-space fast|deep`), run that mode.
-In fast mode, run `reclaim` (install: `go build -o ~/.local/share/toolbox/bin/toolbox-dev ./cmd/toolbox` from the toolbox checkout — `~/.local/bin/reclaim` is a symlink to that dev binary; `toolbox install reclaim` is not a catalog item) and report its AFTER line plus the NOT DELETED block — that is the whole flow, streamed per "Stream every mode" below. Its `--dry-run` doubles as a sizing pass when the disk is not yet critical.
+In fast mode, run `reclaim` (`~/.local/bin/reclaim` links the Homebrew `toolbox` cask: a ladder step missing from `reclaim --list` ships with the next the tools repo release, `brew upgrade --cask toolbox`) and report its AFTER line plus the NOT DELETED block — that is the whole flow, streamed per "Stream every mode" below. Fast mode sizes nothing outside its ladder: "what else / what is big" is deep. Its `--dry-run` doubles as a sizing pass when the disk is not yet critical.
 
 Deep-mode staleness is a DOUBLE signal (last commit AND last working-tree change);
 `gh pr list --state merged --head <branch>` is the merge proof because squash-merged
@@ -109,13 +112,14 @@ foreground.
 
    Rules: record `df` at the START and after each group — the df deltas are the
    ground truth for "Freed". Where a group's physical reclaim differs from its
-   logical size, show both (`~15 G physical (~50 G logical)`) and say why: pnpm/bun
-   node_modules are hardlinks/APFS clones into the global store (deleting frees only
-   uniquely-owned blocks — `pnpm store prune` collects the rest), simulator device
-   trees are APFS clones of the shared runtime image (`du` shows ~3 G each; erasing
-   frees ~nothing), and Docker/OrbStack sparse images reclaim ~1 min late. **Never
-   quote a `du` figure as reclaimable space for a clone/hardlink-shared tree — confirm
-   against `df` before offering it as an option.** Types to group by: sim runtimes, simulators,
+   logical size, show both (`~15 G physical (~50 G logical)`) and say why: any tree
+   built by clonefile or hardlinks — pnpm/bun `node_modules` (into the global store;
+   `pnpm store prune` collects the rest), simulator devices (clones of the runtime
+   image), browser `*.code_sign_clone` copies (clones of the installed app) — frees
+   only its uniquely-owned blocks, and Docker/OrbStack sparse images reclaim ~1 min
+   late. **A clone/hardlink tree's physical size is unknown: offer it as "logical X,
+   physical unknown" and quote only the measured `df` delta — never a `du` figure,
+   nor one reasoned from version mismatch.** Types to group by: sim runtimes, simulators,
    caches, Xcode build products, Docker images/build cache, Docker volumes, stale
    project artifacts. `reclaim` prints its own BEFORE/AFTER df — that IS its summary.
 
@@ -131,8 +135,9 @@ foreground.
 | Homebrew | `brew cleanup -s` | none |
 | Xcode build | `rm -rf ~/Library/Developer/Xcode/DerivedData/*` | none (rebuilds) |
 | Sim data | `xcrun simctl delete unavailable` / `erase all` | low, frees ~0 — APFS clones of the runtime |
-| Unused sim runtime | `xcrun simctl runtime delete <UUID>` (0-device runtimes from report) | none (re-downloads via Xcode) |
+| Unused sim runtime | `xcrun simctl runtime delete <UUID>` (0-device runtimes from report; the report never offers Xcode's own SDK runtime) | none (re-downloads via Xcode); never a runtime its devices still name — they turn unavailable |
 | Sim log spam | shutdown all, then `rm -rf .../Devices/*/data/var/db/diagnostics/*` | none (logs only; apps + data survive) |
+| Crashed-tool temp (Instruments `*.ktrace` > 12 h, orphaned browser `*.code_sign_clone`, bun install extracts > 24 h) | `reclaim --only tmp-instruments,tmp-browser-clones,tmp-bun` | none: a clone a running browser may own stays; clones free far less than listed |
 | Stale project artifacts (deep) | `rm -rf <proj>/node_modules <proj>/.next …` by path from report | low (reinstall on next use) |
 | Stale bun `.bun` entries in a live checkout | `reclaim bun-prune <checkout>` (dry run: unreachable dirs + `.old_modules-*`, sizes), then `--apply` | none: deletes only what nothing resolves to; keeps entries an `ios/Podfile.lock` names, anything under 24 h, and `links/` |
 | Merged wt-* stack (deep) | `docker compose -p <proj> down` then `docker volume rm <vols>` | safe IF MERGED verdict |
@@ -190,5 +195,5 @@ means "confirm by hand", never "auto-delete" (trivial 0B ones are suppressed).
 - A script about to `rm` a `.mov` under `ScreenRecordings/` → that's an unsaved capture;
   the user plays it and trashes it by hand, always.
 - Offering a media cache's full size after seeing only `du` → split it by `KEEP_DAYS` first.
-- Reporting "nothing left to reclaim" from allowlist sections alone → run the giant-file
-  sweep (default) or the full `~/Library` pass (deep) before saying the disk is clean.
+- Reporting "nothing left to reclaim" from allowlist sections or a fast run → run the
+  full-disk pass (deep) before saying the disk is clean.
