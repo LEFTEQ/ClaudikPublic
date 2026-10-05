@@ -1,6 +1,6 @@
 ---
 name: release-readiness
-description: "Use when a whole integration branch must be made release-ready before production — 'release readiness', 'release prep', 'prepare the release', 'QA everything since the last release', 'overnight release lanes', or a go/no-go board per lane × device."
+description: "Qualify an integration branch for production. Use for release preparation, full release QA or a go/no-go assessment across devices."
 ---
 
 # release-readiness

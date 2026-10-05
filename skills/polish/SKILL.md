@@ -1,7 +1,7 @@
 ---
 name: polish
 disable-model-invocation: true
-description: "Polish a branch in its existing PR: fix its open findings, then drive the target's matrix - app (iOS 26, iOS 18 and Android chrome, lifecycle, network), ui (browser rows and the ui-loop capture pass), api (blip chaos, access-control replay, DB) - at quick, default or full intensity until a clean pass. Target and intensity are inferred from the diff, the findings and the cwd unless named."
+description: "Harden a feature in its existing PR against lifecycle, network and concurrency failures. Use when asked to polish or harden a branch."
 ---
 
 # /polish - same PR, the target's matrix, until clean

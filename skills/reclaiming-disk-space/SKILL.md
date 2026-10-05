@@ -19,9 +19,16 @@ so the biggest offenders on a real Mac — an abandoned 80G screen recording, 20
 app-sandbox temp media, 100G+ of crashed-tool temp — stay invisible however often you
 run it. **Second principle: every scan mode ranks every root by SIZE before it consults
 any allowlist — home (dotdirs included), `~/Library`, `~/Work`, the per-user temp root
-`/private/var/folders/<id>/{T,C,X}` (`getconf DARWIN_USER_TEMP_DIR`), `/Applications`,
-`/opt/homebrew`. Big and unclassified means user data until proven otherwise — report
-it, never script it.**
+`/private/var/folders/<id>/{T,C,X}` (`getconf DARWIN_USER_TEMP_DIR`), the shared temp
+roots `/private/tmp` + `/private/var/tmp`, and every other top-level tree of
+`/System/Volumes/Data`. The pass is complete only when the ranked total reaches the Data
+volume's used space (`df -k /System/Volumes/Data`). Big and unclassified means user data
+until proven otherwise — report it, never script it.**
+
+Agent sessions are the fastest-growing owner: run scratch in `/private/tmp`, raw perf and
+verification evidence parked untracked in `~/Exports`, per-worktree simulators, and the
+Claude/Codex transcripts themselves. No cache ladder owns any of it, so every audit sizes
+and ages it, and the user picks what goes.
 
 **Third principle: a warm cache is not garbage.** Media caches (Messages previews,
 app-sandbox temp) are offered only as the slice older than `KEEP_DAYS` (default 60),
@@ -33,8 +40,8 @@ fast and costs an iCloud re-fetch to rebuild.
 | Mode | Invocation | What it does |
 |---|---|---|
 | **fast** | `reclaim` (the tools repo applet; `--until 100G`, `--tier N`, `--dry-run`, `--list`) | EMERGENCY. No scan, no prompt: a fixed ladder of regenerating caches deleted biggest-first, steps in a tier run concurrently, df printed after every step so wins land while slow steps (Docker prune) still run; `--until` stops as soon as enough is free. Tier 1 build/package caches (go-build, Docker build cache + images, bun tarballs + manifests but never `~/.bun/install/cache/links`, npm, DerivedData, gradle…) · 2 tool/app caches + crashed-tool temp (`tmp-instruments`, `tmp-browser-clones`, `tmp-bun`) · 3 aggressive-but-reversible (DeviceSupport, device-less sim runtimes, aged Messages/sandbox tmp, Trash). Never volumes, containers, recordings. Ends with by-hand notes. Spec: `toolbox` `docs/reclaim.md`. |
-| **default** | `bash audit.sh` | The audit + confirm-then-delete workflow below. Adds a generic `>1G` giant-file sweep of `~/Library` + the per-user temp root (finds by size, not by name), screen-recording staging, app-sandbox temp over 1G, the Messages preview cache, and the top log dirs. Also reports device-less iOS runtimes (often 8GB each) and per-sim diagnostics-log stores (~2GB/sim, deletable keeping apps + data). |
-| **deep** | `bash audit.sh deep` | Default audit PLUS a **full-disk pass** ranking every top-level tree of every root in the second principle (anything big with no row in the sections above is UNCLASSIFIED — drill in by hand); stale `~/Work/Projects` projects (no git activity for 7+ days — reports node_modules/.next/.turbo/dist/Pods/vendor/target sizes) and wt-* worktree volume classification (PR merged via `gh` → reclaimable; 7+ days idle → REVIEW-STALE). Thresholds: `STALE_DAYS`, `KEEP_DAYS` env. May take minutes. |
+| **default** | `bash audit.sh` | The audit + confirm-then-delete workflow below. Adds a generic `>1G` giant-file sweep of `~/Library` + the per-user temp root (finds by size, not by name), screen-recording staging, app-sandbox temp over 1G, the Messages preview cache, and the top log dirs. A **session-residue** report: shared-temp scratch (idle = hours since its newest file changed, `IN USE` when a process holds a file inside), `~/Exports` untracked bytes by run and file type, `~/Backups`, Claude/Codex history against `cleanupPeriodDays`. Also reports device-less iOS runtimes (often 8GB each), sims not booted in `STALE_DAYS`+, and per-sim diagnostics-log stores (~2GB/sim, deletable keeping apps + data). |
+| **deep** | `bash audit.sh deep` | Default audit PLUS a **full-disk pass** ranking every top-level tree of every root in the second principle (anything big with no row in the sections above is UNCLASSIFIED — drill in by hand); stale checkouts (every repo and worktree under `~/Work/Projects` per `git worktree list`; no git activity for 7+ days — reports node_modules/.next/.turbo/dist/Pods/vendor/target sizes) and wt-* worktree volume classification (PR merged + idle + clean → reclaimable; merged but recent or dirty → MERGED-ACTIVE; 7+ days idle unmerged → REVIEW-STALE; no worktree claims it → GONE unless a live or unresolved compose name may own it → REVIEW). Thresholds: `STALE_DAYS`, `KEEP_DAYS` env. May take minutes. |
 
 When invoked with an argument (`/reclaiming-disk-space fast|deep`), run that mode.
 In fast mode, run `reclaim` (`~/.local/bin/reclaim` links the Homebrew `toolbox` cask: a ladder step missing from `reclaim --list` ships with the next the tools repo release, `brew upgrade --cask toolbox`) and report its AFTER line plus the NOT DELETED block — that is the whole flow, streamed per "Stream every mode" below. Fast mode sizes nothing outside its ladder: "what else / what is big" is deep. Its `--dry-run` doubles as a sizing pass when the disk is not yet critical.
@@ -52,20 +59,25 @@ but a foreground Bash call shows nothing until the process exits, and piping thr
 `tail`/`head`/`$(…)` buffers it even then. The user sits watching a blank terminal
 while a Docker prune or a `find ~/Library` sweep grinds. Never do that to them.
 
-Launch detached into a log, arm a filter, relay lines as they land:
+Launch detached into a private log, arm a filter, relay lines as they land. Mint the
+log first (`mktemp -t reclaim` prints a unique path only you can write: parallel
+sessions never share or clobber one), then put that LITERAL path in both calls, since
+shell state does not survive between tool calls:
 
 ```bash
-reclaim > /tmp/reclaim.log 2>&1                  # run_in_background: true
-bash audit.sh deep > /tmp/reclaim-audit.log 2>&1 # same, per mode
+mktemp -t reclaim                                 # → e.g. /var/folders/…/T/reclaim.Xa1b
+reclaim > <log> 2>&1                              # run_in_background: true
+/opt/homebrew/bin/bash audit.sh deep > <log> 2>&1 # same, per mode
 ```
 
 Then watch it with the native `Monitor` tool (`persistent: false`, each stdout line
-becomes a notification) — NOT a polling loop:
+becomes a notification) — NOT a polling loop — and delete the log once the run is
+summarized:
 
 | Mode | Monitor command |
 |---|---|
-| fast | `tail -f /tmp/reclaim.log \| grep -E --line-buffered '^\[\|AFTER\|FAILED\|target \|NOT DELETED'` |
-| default / deep | `tail -f /tmp/reclaim-audit.log \| grep -E --line-buffered 'DISK\|OFFENDERS\|CACHES\|GIANT\|STAGING\|DOCKER\|SIM \|DEEP —\|SUGGESTED\|ORPHAN\|MOVED\|REVIEW\|DB!'` |
+| fast | `tail -f <log> \| grep -E --line-buffered '^\[\|AFTER\|FAILED\|target \|NOT DELETED'` |
+| default / deep | `tail -f <log> \| grep -E --line-buffered 'DISK\|OFFENDERS\|CACHES\|GIANT\|STAGING\|DOCKER\|SIM \|RESIDUE\|DEEP —\|SUGGESTED\|ORPHAN\|MOVED\|REVIEW\|DB!'` |
 
 The verdict tokens belong in the audit filter: the section headers prove it is alive,
 the `ORPHAN`/`MOVED`/`REVIEW`/`DB!` lines are the payload you are waiting for.
@@ -79,10 +91,11 @@ foreground.
 ## Workflow (default + deep)
 
 1. **Audit (read-only).** Run the bundled script — it deletes nothing, just reports.
-   Launch it detached and stream it per the section above (the `>1G` sweep and the deep
-   `~/Library` pass each take minutes of silence otherwise):
+   It needs bash 4+ (Homebrew; it exits 2 on macOS's own 3.2). Launch it detached and
+   stream it per the section above (the `>1G` sweep and the deep `~/Library` pass each
+   take minutes of silence otherwise):
    ```bash
-   bash ~/.claude/skills/reclaiming-disk-space/audit.sh        # or: audit.sh deep
+   /opt/homebrew/bin/bash ~/.claude/skills/reclaiming-disk-space/audit.sh   # or: … deep · Codex: ~/.codex/skills/…
    ```
    It prints: disk free, top home offenders, largest caches, `docker system df`,
    **orphan compose stacks** (source dir gone), **orphan/review/DB volumes** with
@@ -138,12 +151,15 @@ foreground.
 | Unused sim runtime | `xcrun simctl runtime delete <UUID>` (0-device runtimes from report; the report never offers Xcode's own SDK runtime) | none (re-downloads via Xcode); never a runtime its devices still name — they turn unavailable |
 | Sim log spam | shutdown all, then `rm -rf .../Devices/*/data/var/db/diagnostics/*` | none (logs only; apps + data survive) |
 | Crashed-tool temp (Instruments `*.ktrace` > 12 h, orphaned browser `*.code_sign_clone`, bun install extracts > 24 h) | `reclaim --only tmp-instruments,tmp-browser-clones,tmp-bun` | none: a clone a running browser may own stays; clones free far less than listed |
+| Session scratch in `/private/tmp` (perf/e2e runs: traces, APKs, frame dumps) | `rm -rf /private/tmp/<name>` for the names the user picks, re-checked at delete time: newest file 24 h+ old (`find -type f` + `stat -f %m`, never the dir mtime) and no process holding a file inside (one `lsof -Fn` pass) | low: scratch, but a paused campaign may still want it |
+| Raw evidence in `~/Exports` (untracked `.pftrace`, frames, recordings) · `~/Backups` | by hand, after the user confirms each run was read or each backup superseded | user data: untracked = the only copy |
+| Claude / Codex transcripts | lower `cleanupPeriodDays` in `~/.claude/settings.json`; never `rm` the jsonl by hand | none |
 | Stale project artifacts (deep) | `rm -rf <proj>/node_modules <proj>/.next …` by path from report | low (reinstall on next use) |
 | Stale bun `.bun` entries in a live checkout | `reclaim bun-prune <checkout>` (dry run: unreachable dirs + `.old_modules-*`, sizes), then `--apply` | none: deletes only what nothing resolves to; keeps entries an `ios/Podfile.lock` names, anything under 24 h, and `links/` |
 | Merged wt-* stack (deep) | `docker compose -p <proj> down` then `docker volume rm <vols>` | safe IF MERGED verdict |
 | Docker cache+images | `docker builder prune -af` && `docker image prune -af` | none (re-pull/rebuild) |
 | Orphan stack | `docker compose -p <proj> down` then `docker volume rm <vols>` | safe IF `ORPHAN` (never `MOVED`) |
-| Stale sim | `xcrun simctl delete <udid>` | safe IF deleted worktree |
+| Stale sim | `xcrun simctl delete <udid>` | safe IF deleted worktree; an `IDLE` sim (not booted in `STALE_DAYS`+) only once the user confirms it — QA sets are kept on purpose |
 
 ## How orphans are classified (and why it's safe)
 
@@ -168,7 +184,8 @@ means "confirm by hand", never "auto-delete" (trivial 0B ones are suppressed).
 |---|---|
 | Running any mode in the foreground, or through `\| tail` | Both hide every progress line until exit — two blank minutes on `reclaim`, more on `audit.sh deep`. The user asked for progress, not a verdict. Detach into a log + `Monitor`. |
 | Auditing only the named dev-tool buckets | 82G of abandoned screen recordings and 22G of Messages sandbox temp scored **zero rows**. Rank generically by size first, classify second. |
-| Summing `Group Containers` **and** `GroupContainersAlias` | The Alias is a symlink to the same tree — double-counts 100G+. Enumerate with `find ~/Library -maxdepth 1 -type d`. |
+| Summing one tree twice through an alias or mount | `GroupContainersAlias` is a symlink to `Group Containers` (100G+ double count); `~/OrbStack` is a live view into the VM whose disk image already counts under `Group Containers/*orbstack`. Enumerate with `find ~/Library -maxdepth 1 -type d`; skip `~/OrbStack`. |
+| Sizing a `find` list with `xargs du -c … \| tail -1` | xargs runs du in batches; `tail` keeps one batch's subtotal (40G read as 1.2G). Sum every line: `xargs -0 du -k \| awk '{s+=$1}'`. |
 | `rm -rf ~/Library/Messages/*` to clear its 22G | `Attachments/` **is** the conversation media. Only `Caches/Previews` and the sandbox tmp regenerate. |
 | Quoting a media cache's TOTAL as reclaimable | Purging all of `Caches/Previews` "freed" 8.5G — but only 1.6G was older than 60d, so 7G of hot cache re-fetched from iCloud and the app got slow. Offer the **aged slice** (`-mtime +KEEP_DAYS`, default 60), and always print what stays. |
 | Deleting an app's sandbox `tmp` while the app runs | Quit it first (`osascript -e 'quit app "Messages"'`), else it rewrites the files. |

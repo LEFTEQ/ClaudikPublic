@@ -14,8 +14,15 @@
 #   (no arg)  default audit
 #   deep      also scan ~/Work/Projects for stale projects' build artifacts
 #             and classify wt-* worktree volumes as MERGED / stale via gh
-# Emergency deletion is a separate script: fast.sh (the only one that deletes).
+# Emergency deletion is the `reclaim` applet (the tools repo) — the only thing that deletes.
 set -uo pipefail
+
+# The liveness maps are associative arrays: bash 4+. macOS /bin/bash is 3.2, which
+# reads string subscripts as arithmetic and would mislabel live volumes.
+if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ]; then
+  echo "audit.sh needs bash 4+ (this is ${BASH_VERSION:-unknown}): run it as /opt/homebrew/bin/bash audit.sh" >&2
+  exit 2
+fi
 
 MODE="${1:-default}"
 STALE_DAYS="${STALE_DAYS:-7}"
@@ -27,19 +34,23 @@ bold() { printf '\033[1m%s\033[0m\n' "$*"; }
 hr()   { printf '%s\n' "------------------------------------------------------------"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# Every worktree of every repo under ~/Work/Projects, asked of git itself (main
+# clones are the .git DIRECTORIES; linked worktrees carry a .git file). A glob of
+# fixed .worktrees depths missed nested repos and called their volumes GONE.
+mapfile -t ALL_WT < <(
+  { git worktree list --porcelain 2>/dev/null
+    find ~/Work/Projects -maxdepth 4 -name .git -type d -prune 2>/dev/null | while IFS= read -r g; do
+      git -C "${g%/.git}" worktree list --porcelain 2>/dev/null
+    done
+  } | awk '/^worktree /{ print substr($0, 10) }' | sort -u)
+
 # Live worktree slugs (used by docker + simulator sections to tell "belongs to
-# a live worktree" from "orphan"). Two sources, because the script may run from
-# ANY cwd: the current repo's worktrees AND a global ~/Work/Projects scan.
-# Keyed by BOTH dir basename and sanitized branch name — compose projects and
-# sim names are usually branch-derived (wt-feat-x for .worktrees/x on feat/x).
-# Cwd-only classification once mislabeled live-worktree sims STALE (2026-07-29).
+# a live worktree" from "orphan"). Keyed by BOTH dir basename and sanitized
+# branch name — compose projects and sim names are usually branch-derived
+# (wt-feat-x for .worktrees/x on feat/x).
 declare -A LIVE_SLUG
-while read -r p; do
-  [ -n "$p" ] && LIVE_SLUG["$(basename "$p")"]=1
-done < <(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2}')
-for w in ~/Work/Projects/*/.worktrees/*/ ~/Work/Projects/*/*/.worktrees/*/; do
-  [ -e "$w/.git" ] || continue
-  LIVE_SLUG["$(basename "${w%/}")"]=1
+for w in "${ALL_WT[@]}"; do
+  LIVE_SLUG["$(basename "$w")"]=1
   br="$(git -C "$w" branch --show-current 2>/dev/null | tr '/' '-')"
   [ -n "$br" ] && LIVE_SLUG["$br"]=1
 done
@@ -47,18 +58,53 @@ done
 # Live compose project NAMES. A project's identity is its NAME, not the path it
 # was last started from: volumes are <project>_<volume>. A repo that moved on
 # disk keeps the old working_dir label while a live checkout still resolves to
-# the same name and WILL reattach the same volumes.
-declare -A LIVE_PROJ
-for d in ~/Work/Projects/*/ ~/Work/Projects/*/*/ \
-         ~/Work/Projects/*/.worktrees/*/ ~/Work/Projects/*/*/.worktrees/*/; do
+# the same name and WILL reattach the same volumes. ${VAR:-default} resolves to
+# its default; a name still holding interpolation after that (`${VAR:?…}`,
+# `fixit-${ENV}`) cannot be resolved here. It is kept as a glob (`fixit-*`, or
+# `*`) with the top-level volume keys its file declares, and a project or volume
+# it could own is REVIEW, never ORPHAN.
+declare -A LIVE_PROJ UNRESOLVED
+for d in ~/Work/Projects/*/ ~/Work/Projects/*/*/ "${ALL_WT[@]/%//}"; do
   [ -d "$d" ] || continue
   while IFS= read -r f; do
-    n="$(sed -n 's/^name:[[:space:]]*//p' "$f" 2>/dev/null | head -1)"; n="${n%\"}"; n="${n#\"}"
-    case "$n" in *':-'*) n="${n##*:-}"; n="${n%\}}" ;; esac     # ${VAR:-default}
-    [ -z "$n" ] && n="$(basename "$(dirname "$f")" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9_-')"
+    n="$(sed -n 's/^name:[[:space:]]*//p' "$f" 2>/dev/null | head -1)"
+    n="${n%\"}"; n="${n#\"}"; n="${n%\'}"; n="${n#\'}"
+    case "$n" in
+      *'$'*)
+        n="$(printf '%s' "$n" | sed -E 's/\$\{[A-Za-z_][A-Za-z0-9_]*:-([^}]*)\}/\1/g')"
+        case "$n" in *'$'*)
+          g="$(printf '%s' "$n" | sed -E 's/\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*/*/g')"
+          # Top-level volume keys at whatever indent the file uses (the first
+          # key under volumes: sets it). None parsed => "?" = ownership unknown.
+          vols="$(awk '/^volumes:/ { f = 1; ind = 0; next } /^[^[:space:]#]/ { f = 0 }
+                       f && /^[[:space:]]+[A-Za-z0-9_.-]+:/ {
+                         match($0, /^[[:space:]]+/); if (!ind) ind = RLENGTH
+                         if (RLENGTH == ind) { k = substr($0, ind + 1); sub(/:.*/, "", k); printf "%s ", k } }' "$f")"
+          [ -n "$vols" ] || vols="? "
+          UNRESOLVED["$g"$'\t'" $vols"]=1
+          n="" ;;
+        esac ;;
+      '') n="$(basename "$(dirname "$f")" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9_-')" ;;
+    esac
     [ -n "$n" ] && LIVE_PROJ["$n"]=1
   done < <(find "$d" -maxdepth 3 \( -name 'docker-compose*.y*ml' -o -name 'compose*.y*ml' \) 2>/dev/null)
 done
+# True when project $1 — and, when given, Docker volume $2 — could belong to a
+# compose file whose name did not resolve. The volume's logical key comes from
+# its com.docker.compose.volume label (an explicit `name:` makes the volume name
+# lie); no label, or a file whose keys did not parse, keeps it ambiguous (true).
+name_unresolved() {
+  local k g vols key=""
+  [ -n "${2:-}" ] && key="$(docker volume inspect "$2" --format '{{ index .Labels "com.docker.compose.volume" }}' 2>/dev/null)"
+  for k in "${!UNRESOLVED[@]}"; do
+    g="${k%%$'\t'*}"; vols="${k#*$'\t'}"
+    # shellcheck disable=SC2053  # $g is a glob on purpose
+    [[ "$1" == $g ]] || continue
+    [ -z "${2:-}" ] || [ -z "$key" ] && return 0
+    case "$vols" in *" $key "*|*" ? "*) return 0 ;; esac
+  done
+  return 1
+}
 
 # ---------------------------------------------------------------------------
 bold "DISK"
@@ -134,6 +180,70 @@ du -sh ~/Library/Logs/* 2>/dev/null | sort -rh | head -5 | sed 's/^/      /'
 hr
 
 # ---------------------------------------------------------------------------
+# Where agent sessions leave gigabytes no cache ladder owns: run scratch in the
+# shared temp roots, raw evidence parked untracked in ~/Exports, the backup home,
+# and the transcripts themselves. User data until the user says otherwise —
+# sized and aged here, never deleted by a script.
+bold "SESSION RESIDUE & ARCHIVES (report only)"
+NOW=$(date +%s)
+sum_g() { awk '{ s += $1 } END { printf "%.1fG", s / 1048576 }'; }
+# Hours since the newest FILE inside changed. Directory mtimes lie: nightly
+# jobs touch them, so a 3-day-idle tree reads as "modified today".
+newest_h() {
+  local m; m="$(find "$1" -type f -print0 2>/dev/null | xargs -0 stat -f %m 2>/dev/null | sort -n | tail -1)"
+  if [ -n "$m" ]; then echo $(( (NOW - m) / 3600 )); else echo "-"; fi
+}
+OPEN_TMP="$(mktemp)"
+lsof -Fn 2>/dev/null | sed -n 's#^n/tmp/#/private/tmp/#p; s#^n/private/tmp/#/private/tmp/#p; s#^n/private/var/tmp/#/private/var/tmp/#p' \
+  | sort -u >"$OPEN_TMP"
+echo "shared temp scratch (>=500M; idle = hours since its newest file changed):"
+find /private/tmp /private/var/tmp -mindepth 1 -maxdepth 1 -print0 2>/dev/null \
+  | xargs -0 -P 8 -n 1 du -skx 2>/dev/null | awk '$1 >= 512000' | sort -rn | head -20 \
+  | while IFS=$'\t' read -r kb d; do
+      if grep -qF -- "$d/" "$OPEN_TMP"; then st="IN USE"; else st="idle $(newest_h "$d")h"; fi
+      printf '      %6.1fG  %-11s %s\n' "$(echo "$kb / 1048576" | bc -l)" "$st" "$d"
+    done
+echo "      ^ delete BY NAME once the user picks: idle 24h+ AND not IN USE (re-check at delete time)."
+rm -f "$OPEN_TMP"
+if [ -d ~/Exports/.git ]; then
+  EXP_LIST="$(mktemp)"
+  (cd ~/Exports && git ls-files -z --others | xargs -0 stat -f '%z %N' 2>/dev/null) >"$EXP_LIST"
+  echo "~/Exports untracked (never committed — this disk holds the only copy): $(awk '{ s += $1 } END { printf "%.1fG", s / 1073741824 }' "$EXP_LIST")"
+  awk '{ sz = $1; $1 = ""; n = split(substr($0, 2), a, "/"); k = a[1]
+         for (i = 2; i <= 3 && i < n; i++) k = k "/" a[i]; s[k] += sz }
+       END { for (k in s) printf "%d\t%s\n", s[k], k }' "$EXP_LIST" \
+    | sort -rn | head -6 | awk -F'\t' '{ printf "      %6.1fG  %s\n", $1 / 1073741824, $2 }'
+  printf '      by type: '
+  awk '{ sz = $1; $1 = ""; e = substr($0, 2); sub(/.*\//, "", e)
+         if (e ~ /\./) sub(/.*\./, "", e); else e = "(noext)"; s[e] += sz; c[e]++ }
+       END { for (k in s) printf "%d\t%s\t%d\n", s[k], k, c[k] }' "$EXP_LIST" \
+    | sort -rn | head -4 | awk -F'\t' '{ printf "%.1fG .%s (%d)  ", $1 / 1073741824, $2, $3 }'
+  echo
+  rm -f "$EXP_LIST"
+fi
+# One directory on case-insensitive APFS, whatever the spelling.
+if [ -d ~/Backups ]; then
+  echo "~/Backups $(du -shx ~/Backups 2>/dev/null | cut -f1) (local insurance — pruned by hand):"
+  find ~/Backups -mindepth 1 -maxdepth 1 -print0 2>/dev/null | xargs -0 du -skx 2>/dev/null \
+    | sort -rn | head -5 | while IFS=$'\t' read -r kb d; do
+        printf '      %6.1fG  idle %sh  %s\n' "$(echo "$kb / 1048576" | bc -l)" "$(newest_h "$d")" "$d"
+      done
+fi
+CPD="$(jq -r '.cleanupPeriodDays // 30' ~/.claude/settings.json 2>/dev/null)"
+echo "session history:"
+printf '      claude transcripts  %s total | %s older than 14d | cleanupPeriodDays=%s\n' \
+  "$(find ~/.claude/projects -type f -print0 2>/dev/null | xargs -0 du -k 2>/dev/null | sum_g)" \
+  "$(find ~/.claude/projects -type f -mtime +14 -print0 2>/dev/null | xargs -0 du -k 2>/dev/null | sum_g)" \
+  "${CPD:-30}"
+if [ -d ~/.codex ]; then
+  printf '      codex sessions      %s total | %s older than 14d | databases %s\n' \
+    "$(find ~/.codex/sessions -type f -print0 2>/dev/null | xargs -0 du -k 2>/dev/null | sum_g)" \
+    "$(find ~/.codex/sessions -type f -mtime +14 -print0 2>/dev/null | xargs -0 du -k 2>/dev/null | sum_g)" \
+    "$(du -k ~/.codex/*.sqlite* 2>/dev/null | sum_g)"
+fi
+hr
+
+# ---------------------------------------------------------------------------
 if have docker && docker info >/dev/null 2>&1; then
   bold "DOCKER / ORBSTACK"
   docker system df 2>/dev/null
@@ -180,6 +290,8 @@ if have docker && docker info >/dev/null 2>&1; then
     if [ -n "$dir" ] && [ ! -d "$dir" ]; then
       if [ -n "${LIVE_PROJ[$proj]:-}" ] || moved_by_path "$dir"; then
         printf "    MOVED   %-44s (name still live; volumes WILL be reused)\n" "$proj"
+      elif name_unresolved "$proj"; then
+        printf "    REVIEW  %-44s (a compose name here did not resolve; may be live)\n" "$proj"
       else
         printf "    ORPHAN  %-44s (source gone: %s)\n" "$proj" "$dir"
       fi
@@ -199,6 +311,7 @@ if have docker && docker info >/dev/null 2>&1; then
     if [ -n "$proj" ] && [ -n "${PROJ_DIR[$proj]:-}" ] && [ ! -d "${PROJ_DIR[$proj]}" ]; then
       if [ -n "${LIVE_PROJ[$proj]:-}" ] || moved_by_path "${PROJ_DIR[$proj]}"; then
         verdict="MOVED"                                          # repo moved — still alive
+      elif name_unresolved "$proj" "$v"; then verdict="REVIEW"  # name unresolvable here
       else verdict="ORPHAN"; fi                                  # name dead too
     elif [ -n "${DANGLING[$v]:-}" ]; then
       # No container references it. Safe unless we can confirm it is live.
@@ -231,13 +344,24 @@ fi
 # ---------------------------------------------------------------------------
 # Simulators tied to deleted worktrees (naming convention: "<app> wt <slug> ...")
 if have xcrun; then
-  bold "STALE SIMULATORS (name contains 'wt <slug>' for a deleted worktree)"
+  bold "STALE SIMULATORS ('wt <slug>' of a deleted worktree; IDLE = not booted in ${STALE_DAYS}+ days)"
   xcrun simctl list devices available 2>/dev/null \
     | grep -oE '[A-Za-z]+ wt [a-z0-9][a-z0-9-]* (customer|worker)?' \
     | while read -r line; do
         slug="$(printf '%s' "$line" | sed -E 's/^[A-Za-z]+ wt ([a-z0-9-]+).*/\1/')"
         if [ -z "${LIVE_SLUG[$slug]:-}" ]; then echo "    STALE  $line"; fi
       done | sort -u
+  # Each device holds 3-4G of installed apps + data; sizes are logical (clones
+  # share blocks), so only df after a delete is the truth.
+  SIM_CUT="$(date -v-"${STALE_DAYS}"d +%Y-%m-%d)"
+  xcrun simctl list devices -j 2>/dev/null \
+    | jq -r --arg cut "$SIM_CUT" '.devices[][] | select(.state != "Booted"
+        and ((.lastBootedAt // "0000") | .[0:10]) < $cut)
+        | [.udid, ((.lastBootedAt // "never") | .[0:10]), .name] | @tsv' 2>/dev/null \
+    | while IFS=$'\t' read -r udid lb name; do
+        printf '    IDLE  %5s  last boot %-10s  %s  %s\n' \
+          "$(du -sh ~/Library/Developer/CoreSimulator/Devices/"$udid" 2>/dev/null | cut -f1)" "$lb" "$udid" "$name"
+      done
   echo "    (list full state with: xcrun simctl list devices)"
   hr
 
@@ -286,12 +410,26 @@ if [ "$MODE" = "deep" ]; then
   # (GroupContainersAlias would double-count Group Containers). VF/X holds the
   # browsers' *.code_sign_clone dirs, so it is ranked one level deeper.
   VF="${TMPROOT%/T/}"
-  bold "DEEP — FULL-DISK PASS (every top-level tree of every root, ranked; minutes)"
-  { find ~ -maxdepth 1 -mindepth 1 -type d ! -path ~/Library ! -path ~/Work -print0
+  bold "DEEP — FULL-DISK PASS (every top-level tree of the Data volume, ranked; minutes)"
+  RANKED="$(mktemp)"
+  { find ~ -maxdepth 1 -mindepth 1 -type d ! -path ~/Library ! -path ~/Work ! -path ~/OrbStack -print0
     find ~/Library ~/Work/Projects "$VF/X" -maxdepth 1 -mindepth 1 -type d -print0
     find ~/Work "$VF" -maxdepth 1 -mindepth 1 -type d ! -path ~/Work/Projects ! -path "$VF/X" -print0
-    printf '%s\0' /Applications /opt/homebrew
-  } 2>/dev/null | xargs -0 -P 8 -n 1 du -sh 2>/dev/null | sort -rh | head -25
+    find /private/tmp /private/var/tmp -maxdepth 1 -mindepth 1 -print0
+    # The rest of Users/private: other accounts + Shared, /private/var (log, db, vm…),
+    # other users' temp roots — each subtree measured once, none of the above twice.
+    find /Users -maxdepth 1 -mindepth 1 -type d ! -path "$HOME" -print0
+    find /private -maxdepth 1 -mindepth 1 -type d ! -name var ! -name tmp -print0
+    find /private/var -maxdepth 1 -mindepth 1 -type d ! -name folders ! -name tmp -print0
+    find /private/var/folders -maxdepth 2 -mindepth 2 -type d ! -path "$(cd "$VF" && pwd -P)" -print0
+    # home + Volumes are mount points (autofs, external disks), not Data-volume bytes
+    find /System/Volumes/Data -maxdepth 1 -mindepth 1 -type d ! -name Users ! -name private \
+      ! -name home ! -name Volumes -print0
+  } 2>/dev/null | xargs -0 -P 8 -n 1 du -skx 2>/dev/null | sort -rn >"$RANKED"
+  awk 'NR <= 25 { s = $1; sub(/^[0-9]+\t/, ""); printf "%7.1fG  %s\n", s / 1048576, $0 }' "$RANKED"
+  awk -v used="$(df -k /System/Volumes/Data | awk 'NR == 2 { print $3 }')" \
+    '{ s += $1 } END { printf "    coverage: ranked %.0fG of %.0fG used on the Data volume; under ~90%% means a root is missing, over 100%% is clones/hardlinks counted twice\n", s / 1048576, used / 1048576 }' "$RANKED"
+  rm -f "$RANKED"
   echo "    Anything big here with no row in the sections above is UNCLASSIFIED —"
   echo "    drill in by hand before deleting; assume user data until proven cache."
   hr
@@ -302,20 +440,21 @@ if [ "$MODE" = "deep" ]; then
   ARTIFACTS=(node_modules .next .turbo dist build .expo Pods ios/Pods .gradle android/.gradle vendor target)
   NOW=$(date +%s)
   CUTOFF=$(( NOW - STALE_DAYS * 86400 ))
-  for d in ~/Work/Projects/*/ ~/Work/Projects/*/*/ \
-           ~/Work/Projects/*/.worktrees/*/ ~/Work/Projects/*/*/.worktrees/*/; do
-    [ -e "$d/.git" ] || continue
-    # Signal 1: last commit older than cutoff
-    ct="$(git -C "$d" log -1 --format=%ct 2>/dev/null)" || continue
-    [ -n "$ct" ] && [ "$ct" -gt "$CUTOFF" ] && continue
-    # Signal 2: no non-artifact working-tree file changed within the window
-    recent="$(find "$d" -maxdepth 4 -type f -mtime -"${STALE_DAYS}" \
+  # A non-artifact working-tree file changed within the window (signal 2 of staleness).
+  recent_edit() {
+    [ -n "$(find "$1" -maxdepth 4 -type f -mtime -"${STALE_DAYS}" \
       -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/.next/*' \
       -not -path '*/.turbo/*' -not -path '*/dist/*' -not -path '*/build/*' \
       -not -path '*/Pods/*' -not -path '*/.gradle/*' -not -path '*/vendor/*' \
       -not -path '*/target/*' -not -path '*/.expo/*' \
-      -print -quit 2>/dev/null)"
-    [ -n "$recent" ] && continue
+      -print -quit 2>/dev/null)" ]
+  }
+  for d in "${ALL_WT[@]}"; do
+    # Signal 1: last commit older than cutoff
+    ct="$(git -C "$d" log -1 --format=%ct 2>/dev/null)" || continue
+    [ -n "$ct" ] && [ "$ct" -gt "$CUTOFF" ] && continue
+    # Signal 2: no non-artifact working-tree file changed within the window
+    recent_edit "$d" && continue
     # Stale: sum reclaimable artifact dirs
     total=0; parts=""
     for a in "${ARTIFACTS[@]}"; do
@@ -326,7 +465,7 @@ if [ "$MODE" = "deep" ]; then
       parts="$parts $a=$(( kb / 1024 ))M"
     done
     [ "$total" -gt 51200 ] || continue   # skip projects under ~50MB reclaimable
-    printf "    %-9s %s\n" "$(( total / 1024 ))M" "${d#"$HOME"/Documents/Work/} ${parts# }"
+    printf "    %-9s %s\n" "$(( total / 1024 ))M" "${d#"$HOME"/Work/Projects/} ${parts# }"
   done | sort -rh
   echo "    (delete the artifact dirs BY PATH after confirming; a stale project's"
   echo "     node_modules etc. reinstall with one command when the project wakes up)"
@@ -337,13 +476,16 @@ if [ "$MODE" = "deep" ]; then
     # Map worktree -> path across ALL Work repos, keyed by BOTH the dir basename
     # and the sanitized branch name: compose projects are usually named after the
     # branch (wt-feat-memberships-ux for .worktrees/memberships-ux on branch
-    # feat/memberships-ux), so basename alone yields false GONE verdicts.
-    declare -A WT_PATH
-    for w in ~/Work/Projects/*/.worktrees/*/ ~/Work/Projects/*/*/.worktrees/*/; do
-      [ -e "$w/.git" ] || continue
-      WT_PATH["$(basename "$w")"]="${w%/}"
+    # feat/memberships-ux), so basename alone yields false GONE verdicts. Two
+    # checkouts can claim one slug (every repo's main clone on `main`): such a
+    # slug has no single owner to judge, so it is REVIEW — never one repo's
+    # merge history and activity standing in for another's.
+    declare -A WT_PATH WT_CLAIMS
+    claim() { [ "${WT_PATH[$1]:-}" = "$2" ] && return; WT_PATH["$1"]="$2"; WT_CLAIMS["$1"]=$(( ${WT_CLAIMS[$1]:-0} + 1 )); }
+    for w in "${ALL_WT[@]}"; do
+      claim "$(basename "$w")" "$w"
       br="$(git -C "$w" branch --show-current 2>/dev/null | tr '/' '-')"
-      [ -n "$br" ] && WT_PATH["$br"]="${w%/}"
+      [ -n "$br" ] && claim "$br" "$w"
     done
     # Unique wt-* compose projects that own volumes
     declare -A WT_PROJ
@@ -356,8 +498,19 @@ if [ "$MODE" = "deep" ]; then
       slug="${proj#wt-}"; slug="${slug%-e2e}"
       wt="${WT_PATH[$slug]:-}"
       verdict=""
-      if [ -z "$wt" ]; then
-        verdict="GONE (worktree deleted — orphan, safe)"
+      if [ "${WT_CLAIMS[$slug]:-0}" -gt 1 ]; then
+        verdict="REVIEW (${WT_CLAIMS[$slug]} checkouts claim '$slug' — owner ambiguous, confirm by hand)"
+      elif [ -z "$wt" ]; then
+        # No worktree of any repo claims the slug. A live compose name (or one
+        # that did not resolve) can still own the project: REVIEW, never GONE.
+        owned=""
+        [ -n "${LIVE_PROJ[$proj]:-}" ] && owned=1
+        for v in ${WT_PROJ[$proj]}; do name_unresolved "$proj" "$v" && owned=1; done
+        if [ -n "$owned" ]; then
+          verdict="REVIEW (no worktree found, but a live or unresolved compose name may own it)"
+        else
+          verdict="GONE (no worktree of any repo claims it — orphan, safe)"
+        fi
       else
         branch="$(git -C "$wt" branch --show-current 2>/dev/null)"
         merged=""
@@ -367,12 +520,16 @@ if [ "$MODE" = "deep" ]; then
         if [ "${merged:-0}" -ge 1 ] 2>/dev/null; then
           # A merged PR is NOT enough: work can continue in the worktree after
           # merge (caught live 2026-07-29 — merged branch, commit 6h old, live
-          # bun processes). Require inactivity too.
+          # bun processes). Require the double signal — no recent commit AND no
+          # uncommitted or recent working-tree change — and hold an unreadable one.
           ct="$(git -C "$wt" log -1 --format=%ct 2>/dev/null)"
-          if [ -n "$ct" ] && [ "$ct" -gt "$CUTOFF" ]; then
-            verdict="MERGED-ACTIVE (PR merged BUT commits within ${STALE_DAYS}d — session may be live, SKIP)"
+          if [ -z "$ct" ]; then
+            verdict="REVIEW (PR merged, last commit unreadable — confirm by hand)"
+          elif [ "$ct" -gt "$CUTOFF" ] || [ -n "$(git -C "$wt" status --porcelain 2>/dev/null)" ] \
+               || recent_edit "$wt"; then
+            verdict="MERGED-ACTIVE (PR merged BUT recent commits, uncommitted or recent edits — session may be live, SKIP)"
           else
-            verdict="MERGED (PR merged, no recent commits — stack + volumes reclaimable, tear down worktree too)"
+            verdict="MERGED (PR merged, idle ${STALE_DAYS}+ days, clean — stack + volumes reclaimable, tear down worktree too)"
           fi
         else
           ct="$(git -C "$wt" log -1 --format=%ct 2>/dev/null)"
@@ -429,6 +586,12 @@ cat <<'CMDS'
   # ---- Logs (app logs only; nothing here is needed to run anything) ----
   # rm -rf ~/Library/Logs/JetBrains/* ~/Library/Logs/CreativeCloud/*
   # rm -f  ~/Library/Logs/*.log.old.*
+
+  # ---- Session residue: BY NAME, after the user picks from the report ----
+  # rm -rf /private/tmp/<name>             # idle 24h+ AND not IN USE, re-checked now
+  # xcrun simctl delete <udid>             # IDLE sims the user no longer needs
+  # ~/Exports untracked runs, ~/Backups: user data — prune by hand, never scripted
+  # transcripts: lower cleanupPeriodDays in ~/.claude/settings.json, never rm the jsonl
 
   # ---- Abandoned screen recordings: BY HAND, never scripted ----
   # open ~/Library/"Group Containers"/group.com.apple.screencapture/ScreenRecordings

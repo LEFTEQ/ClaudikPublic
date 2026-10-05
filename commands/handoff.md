@@ -62,11 +62,12 @@ Synthesize — never paste git diff/log output or transcript. ≤200 lines; a di
 
 ## Hand back
 
-Verify every state fact live (git, gh) — never from session recall. Then print exactly:
+Verify every state fact live (git, gh) — never from session recall; `where` is the main checkout's absolute root (`git rev-parse --path-format=absolute --git-common-dir`, minus `/.git`), never a worktree path, since /continue keys on that dir's name. Then print exactly:
 
 ```
 Handoff written: <path>   (<form>, N phases, M prerequisites)
 
-In a fresh session run:
-  /continue <slug>
+In a fresh session:
+  where:     <absolute main-checkout path>
+  continue:  /continue <slug>
 ```

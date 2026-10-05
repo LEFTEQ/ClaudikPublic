@@ -213,6 +213,10 @@ Same family: `for f in $FILES` iterates **once** over the whole string, and
 `$(cmd)` unquoted stays a single word. Command substitution capturing a
 newline-separated list needs `${(f)"$(cmd)"}` or a `while read` loop.
 
+zsh also ties lowercase `path`, `fpath`, `cdpath` and `manpath` to their uppercase
+variables: `while read -r size path` rewrites `$PATH`, and every later command in the
+loop is `command not found`. Name it `wt`/`p`, or run the loop from a bash script file.
+
 💡 `toolbox gitkit github-io` now detects a whitespace-bearing
 flag name and names this cause outright instead of blaming a missing field.
 

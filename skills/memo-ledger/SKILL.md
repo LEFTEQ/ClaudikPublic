@@ -1,6 +1,6 @@
 ---
-name: memo-ledger
-description: "Use whenever a session learns a durable fact (a user preference, a correction, a trap, a project rule), acts on a remembered one, or needs to look one up - 'remember this', 'note for next time', 'what did we decide about X', a MEMORY.md row cited as #NN, or any write to a memory home's LEDGER.md / MEMORY.md / usage.jsonl."
+name: memo
+description: "Look up or record durable preferences, project rules and lessons through the memo ledger. Use for explicit memory requests or a remembered decision."
 ---
 
 # memo
@@ -17,13 +17,17 @@ event `memo add` writes to `usage.jsonl`.
 ```text
 memo add <type>/<topic>[!] "<one sentence>." [--link '[[notes/<slug>]]'] [--supersedes N] [--retires N] --json
                                       # capture: user|feedback -> personal home, project|reference -> team home
+                                      # team rows are written from a worktree and land via PR; a main checkout refuses MAIN_CHECKOUT
                                       # a fact that changed -> --supersedes N; a fact that is simply gone -> --retires N
 #NN / #tNN                            # act: when a row changes what you do, write its id in your reply or tool input;
                                       # bare #NN is a personal row, #tNN a team row; the Stop hook harvests both
 memo show <ref> --json                # look up: the row plus its linked notes (45, #45, t12, #t12, fixit-team#12, [[LEDGER#^t12]])
 memo find <words>... [--all] --json   # search the ledger, superseded rows marked
 memo render --check --json            # local drift check: exit 2 when MEMORY.md on disk drifted from the ledger
-memo ensure --json                    # SessionStart: render MEMORY.md only when missing or stale; in a TEAM home MEMORY.md and usage.jsonl are gitignored (only LEDGER.md + notes/ are shared), CI runs memorylint check there
+memo ensure --json                    # SessionStart: render MEMORY.md only when missing or stale; in a TEAM home MEMORY.md and usage.jsonl are gitignored (only LEDGER.md + notes/ are shared), CI runs memorylint check there; a team MEMORY.md git still tracks is left as committed and SURFACE_TRACKED names its fix (run it in a worktree, never a main checkout)
+memo renumber [--base <ref>] --json   # merging the base into a branch that also added team rows: LEDGER.md conflicts;
+                                      # this settles it (base ids win, the branch's rows and the citations it wrote move);
+                                      # --dry-run previews from any state; memorylint L009 flags an id that names two rows
 memo migrate <home> > rows.md         # converting a v2 home: edit the template, then memo import rows.md --home <home>
 ```
 
@@ -40,7 +44,8 @@ investigate around it.
    narrative behind it goes to `notes/<slug>.md` and the row links it.
 2. Never edit `LEDGER.md`, `MEMORY.md` or `usage.jsonl` by hand (Edit, Write,
    heredoc, `sed -i`): the PreToolUse hook refuses and names the verb. A
-   wrong row is superseded, never corrected in place.
+   wrong row is superseded, never corrected in place, and a `LEDGER.md`
+   merge conflict is settled by `memo renumber`, never by picking a side.
 3. A detail note is written only when the narrative is real (a runbook, a
    reproduction, a decision trail); otherwise the row is the whole memory.
 4. Cite `#NN` (personal) or `#tNN` (team) only for a row that actually changed

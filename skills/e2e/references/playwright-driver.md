@@ -55,9 +55,9 @@ browser_wait_for → 3s (auth + redirect)
 browser_navigate → page URL
 browser_wait_for → 4s (data load, wait for "Connecting..." to disappear)
 browser_resize → first breakpoint
-browser_take_screenshot → save as {routeId}-{width}.png
+browser_take_screenshot → filename "<ABS worktree>/.vitrinka/mcp/{routeId}-{width}.png"
 browser_resize → next breakpoint
-browser_take_screenshot → save as {routeId}-{width}.png
+browser_take_screenshot → filename "<ABS worktree>/.vitrinka/mcp/{routeId}-{width}.png"
 ... repeat for all breakpoints
 ```
 
