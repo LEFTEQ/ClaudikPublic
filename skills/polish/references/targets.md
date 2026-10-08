@@ -36,7 +36,7 @@ lanes` says which lane is missing and prints the create command.
 |---|---|
 | Lanes | the Onyx browser at the desktop viewport (1440×810) and one phone viewport, light and dark |
 | Default matrix | tiers 1 (blip on the API leg, when the API base is configurable), 3 (browser rows), 4 |
-| `full` adds | the `ui-loop` pass over the touched screens through `/vitrinka:review-loop` (mode `ui-loop`), never a hand-run `ui-loop run`; its lint covers grid, touch targets and type ramp |
+| `full` adds | the `ui-loop` pass over the touched screens: `ui-loop run --only <ids> --viewports … --themes light,dark`, its lint (grid, touch targets, type ramp), `ui-loop publish`; findings are worked like any other |
 | Evidence | the ui-loop board plus the matrix report |
 
 `ui-loop` needs the repo's `uiLoop` config and manifest; without them `full`
