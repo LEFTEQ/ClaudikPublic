@@ -3,12 +3,13 @@
 ## Subagents
 
 - **Subagents inherit the session model.** Never pin a cheaper model (Sonnet, Haiku) — omit the `model` parameter unless the user explicitly asks, and never put a `model:` frontmatter key in `~/.claude/commands/**` or agent files. Cheaper models produce shallower work and cause rework. **Sole exception (Lukáš, 2026-09-14): the e2e fallback writer is `model: opus`** — only when the Codex sidekick is unavailable (next bullet); keep it persistent (one per lane, re-tasked via SendMessage with the "go now, run continuously" re-brief) and say the fallback fired. App-code fixers still inherit the session model.
-- **Manual and verification work runs on the Codex sidekick, not a Claude subagent** (`codex-sidekick` skill, gpt-6.1-sol, effort `medium`). The door is the native `codex` subagent (`codex-high` for "codex high"), present in sessions launched through `cc` with a Codex account registered; `switcheroo codex run` only when the Agent tool lists no `codex` agent, for "codex xhigh", or for a second concurrent live browser lane: subagents share the session's playwright/chrome-devtools servers, which drive only the `$CLAUDE_CODE_SESSION_ID` browser, so one native lane drives it at a time and a `<session>-<lane>` browser is reachable only from a CLI run (`--browser`), which starts servers of its own. Routed: user tests (vitrinka usertest), ad-hoc UI verification of web + Expo apps, computer use, app exploration, bulk read-only static mapping (e.g. e2e discovery, a Workflow's understand phase), code review and adversarial verification of a diff, and e2e/other test writing, reworking and running — inside a Workflow too: those `agent()` calls take `agentType: 'codex'` (schema-validated output works; probed 2026-10-05). Never routed: app source edits, design, small in-task code lookups — the sidekick never edits app source and never commits; the Claude session stays orchestrator, app-code author and committer. One persistent agent or thread per lane, continued with `SendMessage` (native) or `switcheroo codex run --resume <run-id> -` (CLI) — never a fresh one per feature, so selectors, seeds and conventions survive. A CLI run goes out with `run_in_background: true` and its output unredirected: the completion notification is the wait, never a `tail -f`/`sleep` loop on a log. No Codex account left (a `codex` agent ending `No Codex account …`, CLI exit 3), or the sidekick not installed (no `codex` agent and `switcheroo codex run --help` fails), is the only path back to a Claude writer: the Opus fallback above.
+- **Manual and verification work runs on the Codex sidekick, not a Claude subagent**: the native `codex` subagent (`codex-high` for "codex high" or "codex xhigh"), routed by the `codex-sidekick` skill — never the Codex CLI (`switcheroo codex run`, `cx`, `codex exec`). Routed: user tests (vitrinka usertest), ad-hoc UI verification of web + Expo apps, computer use, app exploration, bulk read-only static mapping (e.g. e2e discovery, a Workflow's understand phase), code review and adversarial verification of a diff, and e2e/other test writing, reworking and running — inside a Workflow too, as `agentType: 'codex'`. Never routed: app source edits, design, small in-task code lookups — the sidekick never edits app source and never commits; the Claude session stays orchestrator, app-code author and committer. One persistent agent per lane, continued with `SendMessage` — never a fresh one per feature. Subagents share the session's one browser, so live browser lanes take turns. No `codex` agent listed, or one ending `No Codex account …`, is the only path back to a Claude writer: the Opus fallback above.
+- **Delegate to fresh agents, never forks.** Spawn a named type (`codex`, `claude`, `general-purpose`, a Workflow `agent()`), never `subagent_type: "fork"`: a fork copies this whole conversation into every agent. The brief is self-contained — goal, absolute worktree path, scope, done-when, return shape — and anything long (a handoff, plan or prior findings) goes in a file the brief names, never pasted. Ask for a compact return (status, findings, files), not a narrative.
 - **Verify worktree base commit before parallel dispatch.** `git worktree add` forks from current `HEAD`, which may be stale or differ across worktrees spawned in sequence. Run `git worktree list` and confirm every worktree forks from the same expected commit; when in doubt, commit pending state to a known base first. See `~/.claude/docs/git-safety-full.md`.
 - **A single `git log`/`ls` read can RACE an agent's in-flight commits.** "Clean tree / no commits" is not evidence the agent stalled. Get the agent's own report (or re-check after a beat) before standing one down — a duplicate respawn on the same paths nearly collided during the Onyx build.
 - **One writer per workspace.** Parallelize only INDEPENDENT plans, each on its own `git worktree` + disjoint branch; concurrent commits to one checkout race `.git/index.lock`. Disjoint-path branches merge clean with `--no-ff`. Lanes that do share a checkout share its processes and its dev app too: a lane stops only PIDs it started (a `pkill -f` pattern killed another lane's Playwright run), and a lane that measures runs against its own frozen build — a detached worktree at a fixed commit with its own devbox workspace — never the shared dev app other lanes redeploy mid-measurement.
 - **Fresh `Agent` spawns execute from the spawn prompt; `SendMessage` re-tasks are flaky** — a re-tasked background agent often does one turn then idles. Re-brief with "go now, run continuously; your next message is the green gate or a real blocker", and don't answer idle pings individually.
-- **529 throttling** hits with 5–6 concurrent heavy agents. Throttle to batches of 2, or one-agent-per-plan sequential. The main loop's own tool calls don't contend on the subagent inference budget — do small critical edits yourself while agents are throttled.
+- **On 529 throttling**, drop the Claude agents to batches of 2, or one-agent-per-plan sequential (`codex` agents bill Codex and don't count). The main loop's own tool calls don't contend on the subagent inference budget — do small critical edits yourself while agents are throttled.
 - **Freeze the shared interface contract before authoring plans**, then run one consistency-review pass over them: it catches cross-plan contradictions on paper. Ask briefs to surface structural blockers as Option A/B/C rather than thrashing, and record toolchain constraints that execution surfaces as contract amendments.
 - **Memory doctrine lives in `~/.claude/skills/memory/SKILL.md`** — read it before saving or reorganizing memory. Capture inline at the moment (feedback after corrections, project/reference for non-derivable discoveries); gate every save with "re-derivable in <30 s?" → don't save. `/memory:learn`, `/memory:dream`, `living-docs`, `context-manager`, and `.claude/aix.md` registries are all RETIRED.
 
@@ -17,11 +18,10 @@
 These OVERRIDE the Workflow tool's built-in quality patterns (per-finding adversarial verify, N-lens panels, one-agent-per-item).
 
 - Each agent gets a meaningful batch — a subsystem, a file group, 5–15 findings — worked sequentially in one session. One-item-per-agent is forbidden: it wastes ~40k tokens per agent on redundant repo orientation.
-- Hard caps: ≤ 4 agents per phase, ≤ 10 per run. More items → partition into ≤ 4 batches grouped by file/subsystem. Exceed only on explicit user request for exhaustive coverage or an explicit token budget — and `log()` the planned count first.
+- Hard caps: ≤ 20 agents per phase, < 50 per run. More items → partition into ≤ 20 batches grouped by file/subsystem. Exceed only on explicit user request for exhaustive coverage or an explicit token budget — and `log()` the planned count first.
 - Verify in bulk, single-vote: one agent per batch of findings returning per-finding verdicts. Never N refuters per finding.
 - Prefer phases inside one agent over agent-per-stage when stages share context (build → test → fix). Fan out only for genuinely disjoint work.
 - **Never SendMessage an agent that a running Workflow owns.** The reply resumes a second concurrent copy of that agent, which then collides with the original in its worktree. Act from main instead.
-- Reference failure: a verify phase once spawned 39 agents ≈ 1.8M tokens for work 2–3 batched agents would have done as well.
 
 ## Fan-Out Over an External API — Rate Limits Are a Design Input
 
@@ -39,16 +39,17 @@ oldest 7 days — every parked teammate re-bills its FULL accumulated context (o
 300–800k tokens) each time anything wakes it (usage-limit auto-retry, goal check-ins,
 monitors). Finished-but-alive agents are the single largest hidden usage sink.
 
-- **Agent teams are off** (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=0` in
-  `~/.claude/settings.json`, 2026-09-26). With them on, every *named* Agent spawn
-  silently became a tmux teammate — the source of the swarms above. Parallel work is
-  subagents and Workflows; a named subagent stays addressable via SendMessage without
-  a swarm. Re-enabling is a per-session opt-in (`claude --settings`), never the
-  global default. `teammateMode: "tmux"` stays so that opt-in needs one flag.
+- **Agent teams are on** (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in
+  `~/.claude/settings.json`, `teammateMode: "tmux"`; re-enabled 2026-10-08 after
+  being off from 2026-09-26). Every *named* Agent spawn becomes a tmux teammate, and
+  that is how the swarms above built up — so the teardown below is mandatory. When
+  you don't need a teammate, leave the Agent spawn unnamed (a plain subagent) or
+  use a Workflow. To switch teams off for one session, pass
+  `claude --settings '{"env":{"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS":"0"}}'`.
 - **An agent ends when its goal ends.** A persistent named subagent (the Opus fallback e2e writer)
   is stopped when its loop ends; parking one "in case" is forbidden — transcripts
   persist and any agent can be respawned cheaper than one wake of a parked 500k
-  context. A session that opted into a team still owes the teardown: `shutdown_request`
+  context. A session that spawned teammates owes the teardown: `shutdown_request`
   to every teammate, then `tmux -L claude-swarm-<pid> kill-server`. Enforced for
   leftovers: `claude-guards swarm-teardown` runs on SessionEnd (the leader's swarm)
   and on SessionStart with `--dead-only` (dead ones).

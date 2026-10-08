@@ -26,7 +26,7 @@ Referenced from CLAUDE.md (**Browser**). The Onyx browser is THE browser. `claud
   - chrome-devtools: `filePath: "<ABS work tree>/.vitrinka/mcp/<name>"`, or omit it for an inline image.
 - A relative name resolves in the session's LAUNCH dir (both servers run there), never in the cwd: from a worktree it lands in the main checkout, so `browser:screenshot-dir` refuses it there and names the absolute path. It refuses any destination outside a work tree's `.vitrinka/mcp/`.
 - The servers' own roots sandboxes are off in the onyx wrappers (they admitted no worktree, and chrome-devtools nothing but `$TMPDIR`); the guard is the one rule.
-- Subagents share the session's playwright/chrome-devtools servers, bound to the `$CLAUDE_CODE_SESSION_ID` browser: a `<session>-<lane>` browser is reachable only from a `switcheroo codex run --browser`.
+- Subagents share the session's playwright/chrome-devtools servers, bound to the `$CLAUDE_CODE_SESSION_ID` browser: live lanes take turns on it, and a `<session>-<lane>` browser is unreachable.
 - The onyx headless browser opens at 748×486. Call `browser_resize` to 1440×810 before any desktop screenshot meant for judging or for a board.
 
 ## Installs

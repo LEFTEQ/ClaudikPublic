@@ -66,8 +66,9 @@ last-used: YYYY-MM-DD        # bumped when the note actually changes behavior mi
 Before writing any memory, walk down; memory is the LAST resort, not the default:
 
 1. **Rule of engagement** — how to always behave ("never stash", "PRs ready-for-review") → CLAUDE.md or a `paths:`-scoped rule. That's an instruction/briefing, not a memory; a correction that generalizes into a standing rule graduates there and never gets a lesson file.
-2. **Operational choreography** — how to do X right *here* (setup sequences, gotcha chains, fix-it recipes) → a **script/tool**, never prose. Abstract the complexity into code (repo scripts, or the tools repo when cross-project) written AI-first: validate inputs; on misuse, return instructions the agent can self-repair from in a mini-loop; where deterministic, autofix and return a one-line "autofixed <what>" so the agent isn't confused by unexpected state. Memory keeps at most ONE pointer line to the tool. (Reference: FixIt's worktree tooling — a toolset that sets the worktree up right beats paragraphs describing the gotchas.)
-3. Only what remains — a fact, not a behavior or a procedure — may become a memory, if it passes the paid-for gate.
+2. **Our own tooling** — a lesson about a skill, workflow, CLI or instruction set we develop refines that tool for everyone: `/update-skill` in place, a PR to its repo, or — when only code can fix it — a task on its owning epic. Never a memo: that would hide the fix in one person's recall.
+3. **Operational choreography** — how to do X right *here* (setup sequences, gotcha chains, fix-it recipes) → a **script/tool**, never prose. Abstract the complexity into code (repo scripts, or the tools repo when cross-project) written AI-first: validate inputs; on misuse, return instructions the agent can self-repair from in a mini-loop; where deterministic, autofix and return a one-line "autofixed <what>" so the agent isn't confused by unexpected state. Memory keeps at most ONE pointer line to the tool. (Reference: FixIt's worktree tooling — a toolset that sets the worktree up right beats paragraphs describing the gotchas.)
+4. Only what remains — a fact, not a behavior or a procedure — may become a memory, if it passes the paid-for gate.
 
 ## Capture — the paid-for gate
 
