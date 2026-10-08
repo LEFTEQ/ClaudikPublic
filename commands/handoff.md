@@ -72,4 +72,4 @@ In a fresh session:
   continue:  /continue <slug>
 ```
 
-When `$VITRINKA_SESSION_LAUNCHER` is set and the user picked a fresh session, run `${=VITRINKA_SESSION_LAUNCHER} <slug> <where>` instead (zsh's `${=…}` splits the flags it may carry; it opens the next cmux tab and runs `/continue <slug>` there): exit 0 → print its receipt line in place of the `In a fresh session` block; unset or non-zero → print the block as above.
+When `$VITRINKA_SESSION_LAUNCHER` is set and the user picked a fresh session, run `sh -c '${VITRINKA_SESSION_LAUNCHER:?} "$@"' _ <slug> <where>` instead (`sh -c` splits the flags the variable may carry in any shell, and an unset one exits non-zero; it opens the next cmux tab and runs `/continue <slug>` there): exit 0 → print its receipt line in place of the `In a fresh session` block; unset or non-zero → print the block as above.
