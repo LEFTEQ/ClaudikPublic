@@ -1,6 +1,6 @@
 ---
 name: hotfix-lane
-description: "Use when production needs a fix that main cannot ship — 'hotfix', 'patch the last release', 'fix prod without shipping main', 'branch from the tag', or when a release-lineage hotfix branch (hotfix/<slug>) must be driven to deploy and forward-port. Trunk-based repos only; the repo must carry hotfix.yaml (run `hotfix init` if not)."
+description: "Use when production needs a fix that main cannot ship: 'hotfix', 'patch the last release', 'fix prod without shipping main', 'branch from the tag', 'ship an OTA fix for the live app', 'roll back the OTA', or when a release-lineage hotfix branch (hotfix/<slug>, or another lane such as ota/<slug>) must be driven to deploy and forward-port. Trunk-based repos only; the repo must carry hotfix.yaml (run `hotfix init` if not)."
 ---
 
 # hotfix-lane
@@ -21,7 +21,13 @@ hotfix deploy <slug> --watch --json   # dispatch production on the branch; the l
 hotfix finish <slug> --json           # after a green deploy: merge the PR; the merge commit carries the tag to main
 hotfix status <slug> --json           # anytime: phase + the exact next command
 hotfix forward <slug> --json          # only when finish reports FORWARD_PORT_CONFLICT: cherry-pick worktree off main
+hotfix rollback <slug> --watch --json # a lane with deploy.rollback: undo what the head shipped, then commit the real fix + pr
 ```
+
+A repo may run several lanes (`lanes:` in `hotfix.yaml`, e.g. `ota` for
+mobile OTA updates): add `--lane <name>` (inferred inside that lane's
+worktree). A staged lane deploys one stage per `deploy` call, in order,
+some behind a commit-status gate whose command `next` prints first.
 
 Every verb emits `{v, ok, verb, data, diagnostics, next}` under `--json`.
 **The envelope's `next` field IS the protocol** — run what it says,

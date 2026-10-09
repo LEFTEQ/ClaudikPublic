@@ -34,7 +34,7 @@ issues status --json                                         # loop: do data.nex
 | `comment` | `--apply` only after the human approves its dry-run batch at the gate |
 | `sync` | drive each open PR with `/prm`, one per repo at a time (its repo's MERGE_POLICY decides merge), then `sync` |
 | `lane wait` | a workflow died mid-lane: wait it out, then re-slice |
-| `report --push` | run it; print the returned URL bare on its own line |
+| `report --push` | run it; print `data.report.url` as a masked link labelled by the report title (`[Issue sweep <run>](<url>)`) |
 | anything else | run it |
 
 Also push the report after the triage slices, after the gate and after each fix workflow.

@@ -80,9 +80,9 @@ See `capacity.md`.
 - **Ledgers.** Keep `results.md` (lane outcomes), `decisions.md` (the human's gate list) and `rotation.md` (waves, GO/park, resumes).
 - **Stop finished agents.** Send a shutdown to lanes that handed back, stop monitors, and end the swarm when its goal ends. Never park idle agents.
 - **Usage limits.** Wait for the reset. Resume transcript agents by message (`messages.md` "resume"). Re-spawn a dead lane from a state snapshot (git status/log, PR state, run logs) plus its brief.
-- **Hand off the orchestrator role** at ~70% context (`claude-guards ctx "$CLAUDE_CODE_SESSION_ID"`) while lanes are still live: `/handoff` to a fresh session with the run directory, `rotation.md` and `results.md`. The lanes keep reporting to "the orchestrator", which is now that session.
+- **Hand off the orchestrator role** at ~90% context (`claude-guards ctx "$CLAUDE_CODE_SESSION_ID"`) while lanes are still live: `/handoff` to a fresh session with the run directory, `rotation.md` and `results.md`. The lanes keep reporting to "the orchestrator", which is now that session.
 - **Start the final phase** only when every lane in `lanes.json` has a line in `results.md`. First send every lane agent and the device runner a shutdown and `TaskStop` their monitors: the final agent then owns the stacks and the devices, and never overlaps a live lane.
 
 ## §7 Final phase, in a fresh agent
 
-`Agent({name: "final", prompt: <final-brief.md>})`, or a `/handoff` into a fresh session when this one is past ~70%. The brief's step 0 refuses to start while any lane lacks a `results.md` line. See `final-phase.md`.
+`Agent({name: "final", prompt: <final-brief.md>})`, or a `/handoff` into a fresh session when this one is past ~90%. The brief's step 0 refuses to start while any lane lacks a `results.md` line. See `final-phase.md`.

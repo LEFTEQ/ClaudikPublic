@@ -27,7 +27,7 @@ readiness render --dir <run-dir> --json    # now also brief-<slug>.md
 # phase 4: Agent({name: "lane-<slug>", prompt: <brief-<slug>.md>}) per lane, in waves; Agent({name: "device-runner", prompt: <device-runner.md>})
 # phases 5–6: govern capacity, relay, keep results.md / decisions.md / rotation.md
 readiness render --dir <run-dir> --check   # before every spawn and broadcast: the rendered files match their inputs
-# at ~70% context with lanes live: /handoff the orchestrator role (references/phases.md §6)
+# at ~90% context with lanes live: /handoff the orchestrator role (references/phases.md §6)
 # phase 7: every lane has a results.md line; stop lanes + runner, then Agent({name: "final", prompt: <final-brief.md>})
 ```
 
