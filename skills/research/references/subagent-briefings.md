@@ -1,13 +1,13 @@
 # Subagent Briefings — `research`
 
-Each section is a **complete briefing prompt** for one subagent. Pass it verbatim in the `prompt` field of the `Agent` call. Omit `model` — subagents inherit the session model. The concision contract and tool-loading preflight are embedded verbatim in each template — do not strip them.
+Each section is a **complete briefing prompt** for one subagent. Pass it verbatim as the subagent's prompt. Don't pin a cheaper model — subagents inherit the session model. The concision contract and tool-loading preflight are embedded verbatim in each template — do not strip them.
 
 ---
 
 ## 1. Official-docs subagent
 
-**`description`:** "Tier-1 docs research on {topic}"
-**`subagent_type`:** "general-purpose"
+**Description:** "Tier-1 docs research on {topic}"
+**Agent:** a subagent with web search and fetch tools
 
 **Prompt template:**
 
@@ -27,9 +27,9 @@ TIER-1 SOURCES (use these, not blogs):
 - Anthropic / OpenAI / Google official model docs (for AI topics)
 
 PREFLIGHT (run BEFORE refusing for "no web tools"):
-WebFetch and WebSearch are DEFERRED tools — they don't appear in your initial toolset. To load them:
+Your web search and fetch tools may be DEFERRED — absent from your initial toolset until loaded. In Claude Code, load them:
   → Call ToolSearch with query="select:WebFetch,WebSearch", max_results=2
-After ToolSearch returns, both tools are immediately callable. Only refuse if ToolSearch ITSELF is unavailable. Do NOT report "I don't have WebFetch" without trying ToolSearch first.
+After loading, both tools are immediately callable. Only refuse if no web tool can be loaded at all. Do NOT report "I don't have web access" without trying to load them first.
 
 METHOD:
 1. Run the preflight above to make WebFetch available.
@@ -54,8 +54,8 @@ HARD CONSTRAINTS — non-negotiable. Violating any of these wastes the user's to
 
 ## 2. Secondary-sources subagent
 
-**`description`:** "Real-world patterns on {topic}"
-**`subagent_type`:** "general-purpose"
+**Description:** "Real-world patterns on {topic}"
+**Agent:** a subagent with web search and fetch tools
 
 **Prompt template:**
 
@@ -77,13 +77,13 @@ REPUTABLE SOURCES (in this order of preference):
 - AVOID: tutorials from content farms, "10 tips" listicles, AI-generated SEO posts.
 
 PREFLIGHT (run BEFORE refusing for "no web tools"):
-WebFetch and WebSearch are DEFERRED tools — they don't appear in your initial toolset. To load them:
+Your web search and fetch tools may be DEFERRED — absent from your initial toolset until loaded. In Claude Code, load them:
   → Call ToolSearch with query="select:WebFetch,WebSearch", max_results=2
-After ToolSearch returns, both tools are immediately callable. Only refuse if ToolSearch ITSELF is unavailable. Do NOT report "I don't have WebSearch" without trying ToolSearch first.
+After loading, both tools are immediately callable. Only refuse if no web tool can be loaded at all. Do NOT report "I don't have web access" without trying to load them first.
 
 METHOD:
 1. Run the preflight above to make WebSearch + WebFetch available.
-2. WebSearch for "{topic} {stack-keyword} 2025" and "{topic} best practices {stack-keyword}".
+2. WebSearch for "{topic} {stack-keyword} {current year}" and "{topic} best practices {stack-keyword}".
 3. WebFetch 2-3 results that look reputable.
 4. Extract patterns + known pitfalls.
 
@@ -104,8 +104,8 @@ HARD CONSTRAINTS — non-negotiable. Violating any of these wastes the user's to
 
 ## 3. Project-context subagent
 
-**`description`:** "How {topic} appears in this project"
-**`subagent_type`:** "Explore"
+**Description:** "How {topic} appears in this project"
+**Agent:** read-only repo exploration — the Codex sidekick via the ccx skill when it is installed, otherwise any read-only exploration subagent
 
 **Prompt template:**
 
@@ -144,8 +144,8 @@ HARD CONSTRAINTS — non-negotiable. Violating any of these wastes the user's to
 
 ## 4. Contrarian subagent
 
-**`description`:** "Devil's-advocate check on {topic}"
-**`subagent_type`:** "general-purpose"
+**Description:** "Devil's-advocate check on {topic}"
+**Agent:** a subagent with web search and fetch tools
 
 **Prompt template:**
 
@@ -161,9 +161,9 @@ TASK: Find genuine dissenting views, deprecation notices, "X considered harmful"
 RECENCY GATE — AI topics: for any claim about model capability, behavior, or best practice, sources older than ~8 months are stale (the models change faster than the literature); prefer newer, and flag anything older as dated in Confidence.
 
 PREFLIGHT (run BEFORE refusing for "no web tools"):
-WebFetch and WebSearch are DEFERRED tools — they don't appear in your initial toolset. To load them:
+Your web search and fetch tools may be DEFERRED — absent from your initial toolset until loaded. In Claude Code, load them:
   → Call ToolSearch with query="select:WebFetch,WebSearch", max_results=2
-After ToolSearch returns, both tools are immediately callable. Only refuse if ToolSearch ITSELF is unavailable. Do NOT report "I don't have WebSearch" without trying ToolSearch first.
+After loading, both tools are immediately callable. Only refuse if no web tool can be loaded at all. Do NOT report "I don't have web access" without trying to load them first.
 
 METHOD:
 1. Run the preflight above to make WebSearch + WebFetch available.

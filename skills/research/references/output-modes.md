@@ -16,7 +16,7 @@ If ambiguous, ask the user: "Do you want this taught (long-form explanation), or
 
 ## Mode 1: Teach-me
 
-The `/me:teachme` 4-beat format (`commands/me/teachme.md`):
+A 4-beat explanation:
 
 1. **What was being asked / the situation** — restate in plain language
 2. **Why it matters / context** — the gap, the trade-off, the definitions
@@ -26,7 +26,7 @@ The `/me:teachme` 4-beat format (`commands/me/teachme.md`):
 **Plus:**
 - **Inline citations** — every factual claim gets a parenthesized source URL on its first appearance: `(react.dev/learn/state-management)`
 - **Version notes called out** — if a finding is version-specific, bold-tag it: **In Expo SDK 50+:** …
-- **End with** the standard teach-me closing: Bottom line / Open items / next-step question.
+- **End with** Bottom line / Open items / Next step.
 
 **Example skeleton:**
 
@@ -52,7 +52,7 @@ You want to know whether to use Context or Redux for [thing] in your Expo app.
 
 **Bottom line:** [one-sentence headline].
 **Open items:** [anything unresolved, if any].
-**Next step:** [direct question offering the concrete next action].
+**Next step:** [the concrete next action, stated — not a question].
 ```
 
 ---
@@ -155,11 +155,3 @@ For higher-level "how should we structure X" questions. Heavier on trade-offs an
 
 **Sources:** [bullet list of URLs.]
 ```
-
----
-
-## Closing line (all three modes)
-
-After the body, add exactly one line:
-
-> Want me to dig deeper on any of these, or move to implementation?
