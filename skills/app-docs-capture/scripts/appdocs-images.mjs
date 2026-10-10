@@ -9,6 +9,8 @@
  * shells out to `magick` (ImageMagick) or `cwebp`.
  *
  *   add <group>/<doc> -v <N> -n <name> -f <sourceFile> [--force] [--no-raw]
+ *       all-or-nothing: --force replaces the image's whole set (WebP + raws or
+ *       .noraw marker); a failed add changes nothing, so rerunning is the recovery
  *   bump <group>/<doc> --from <N> --to <M> [name…]
  *   list [group[/doc]]
  *   check
@@ -32,10 +34,29 @@ function encoderAvailable() {
   die('need `magick` (ImageMagick) or `cwebp` on PATH for WebP encoding');
 }
 
-function encodeWebp(src, dest) {
-  const bin = encoderAvailable();
+function encodeWebp(bin, src, dest) {
   if (bin === 'magick') execFileSync('magick', [src, '-quality', QUALITY, dest]);
-  else execFileSync('cwebp', ['-q', QUALITY, src, '-o', dest], { stdio: 'ignore' });
+  else execFileSync('cwebp', ['-q', QUALITY, src, '-o', dest], { stdio: ['ignore', 'ignore', 'inherit'] });
+  if (!fs.existsSync(dest) || fs.statSync(dest).size === 0) throw new Error(`${bin} produced no WebP`);
+}
+
+// Swap a staged set into `dir`. Every published file it displaces is parked in
+// <stage>/old first, so a failed rename rolls back to the previous set exactly.
+function publish(stage, dir, incoming, displaced) {
+  const old = path.join(stage, 'old');
+  const undo = [];
+  const move = (from, to) => { fs.renameSync(from, to); undo.push(() => fs.renameSync(to, from)); };
+  try {
+    fs.mkdirSync(old);
+    fs.mkdirSync(dir, { recursive: true });
+    for (const f of displaced) move(path.join(dir, f), path.join(old, f));
+    for (const f of incoming) move(path.join(stage, f), path.join(dir, f));
+  } catch (err) {
+    try { while (undo.length) undo.pop()(); } catch (rollback) {
+      throw Object.assign(new Error(`${err.message}; rollback failed (${rollback.message}) — the previous files are in ${path.relative(process.cwd(), old)}`), { keepStage: true });
+    }
+    throw err;
+  }
 }
 
 function parseTarget(arg) {
@@ -70,18 +91,38 @@ if (cmd === 'add') {
   if (!/^\d+$/.test(version ?? '')) die('-v <int> required');
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name ?? '')) die('-n <kebab-name> required (no dots)');
   if (!from || !fs.existsSync(from)) die('-f <sourceFile> must exist');
-
-  fs.mkdirSync(dir, { recursive: true });
   const rawExt = path.extname(from).slice(1).toLowerCase() || 'png';
-  const rawDest = path.join(dir, `v${version}.${name}.${rawExt}`);
-  const minDest = path.join(dir, `v${version}.${name}.min.webp`);
-  for (const dest of [rawDest, minDest]) {
-    if (fs.existsSync(dest) && !force) die(`${path.relative(process.cwd(), dest)} exists — pass --force to override`);
+  if (!noRaw && !/^(png|webp|jpg|jpeg)$/.test(rawExt)) die(`raw must be png, webp, jpg or jpeg (got .${rawExt}) — convert it or pass --no-raw`);
+  const bin = encoderAvailable(); // before anything is written
+
+  // One image's published set is its WebP plus either raws or the .noraw marker.
+  // A replacement takes the whole old set out: a stale raw must never outlive --no-raw.
+  const stem = `v${version}.${name}`;
+  const minName = `${stem}.min.webp`;
+  const sideName = noRaw ? `${stem}.noraw` : `${stem}.${rawExt}`;
+  const displaced = (fs.existsSync(dir) ? fs.readdirSync(dir) : []).filter((f) => {
+    const m = f.match(NAME_RE);
+    return m && `v${m[1]}.${m[2]}` === stem && (!m[3] || f === minName);
+  });
+  if (displaced.length && !force) die(`${path.relative(process.cwd(), path.join(dir, displaced[0]))} exists — pass --force to replace ${stem}`);
+
+  // Encode into a staging dir on the destination's filesystem; publish only a
+  // complete set, by renames. A failure leaves the published set untouched, so a rerun is the recovery.
+  fs.mkdirSync(BASE, { recursive: true });
+  const stage = fs.mkdtempSync(path.join(BASE, '.add-'));
+  try {
+    encodeWebp(bin, from, path.join(stage, minName));
+    if (noRaw) fs.writeFileSync(path.join(stage, sideName), '');
+    else fs.copyFileSync(from, path.join(stage, sideName));
+    publish(stage, dir, [minName, sideName], displaced);
+  } catch (err) {
+    if (err.keepStage) die(`add failed: ${err.message}`);
+    fs.rmSync(stage, { recursive: true, force: true });
+    die(`add failed, ${stem} left as it was: ${err.message}`);
   }
-  if (noRaw) fs.writeFileSync(path.join(dir, `v${version}.${name}.noraw`), '');
-  else fs.copyFileSync(from, rawDest);
-  encodeWebp(from, minDest);
-  ok(`${path.relative(process.cwd(), minDest)}${noRaw ? ' (no raw)' : ' + raw'}`);
+  fs.rmSync(stage, { recursive: true, force: true });
+  const gone = displaced.filter((f) => f !== minName && f !== sideName);
+  ok(`${path.relative(process.cwd(), path.join(dir, minName))}${noRaw ? ' (no raw)' : ' + raw'}${gone.length ? ` — removed ${gone.join(', ')}` : ''}`);
 } else if (cmd === 'bump') {
   const fromV = flag(args, '--from');
   const toV = flag(args, '--to');
@@ -135,6 +176,7 @@ if (cmd === 'add') {
         const hasRaw = siblings.some((f) => { const s = f.match(NAME_RE); return s && !s[3] && `v${s[1]}.${s[2]}` === stem && s[4] !== 'noraw'; });
         const noRaw = siblings.includes(`${stem}.noraw`);
         if (!hasRaw && !noRaw) { console.log(`✗ min without raw: ${path.relative(BASE, p)}`); bad++; }
+        if (hasRaw && noRaw) { console.log(`✗ raw beside its .noraw marker (re-run add --force): ${path.relative(BASE, p)}`); bad++; }
       }
     }
     if (fs.readdirSync(dir).length === 0) console.log(`- empty dir (prune): ${path.relative(BASE, dir)}`);

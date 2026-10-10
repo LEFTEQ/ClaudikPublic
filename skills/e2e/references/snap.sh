@@ -49,7 +49,7 @@ __snap_out_path() {
 __snap_capture_raw() {
   local target="$1"
   local platform="${E2E_PLATFORM:-ios}"
-  local udid="${E2E_UDID}"
+  local udid="${E2E_UDID:-}"
   case "$platform" in
     ios)
       xcrun simctl io "$udid" screenshot "$target" >/dev/null 2>&1
@@ -68,22 +68,52 @@ __snap_capture_raw() {
   [ -s "$target" ] || { echo "snap: capture failed on $platform (no bytes) — check device connection" >&2; return 1; }
 }
 
+# --- internal: encode src → out as a tier JPEG, cropped when given a geometry --
+# Writes a sibling temp file and renames it over out only once the encoder exited
+# 0 AND wrote bytes, so a failed run never leaves a partial file, nor a stale
+# same-label JPEG passing as fresh evidence. Never touches src.
+__snap_encode() {
+  local src="$1" out="$2" crop="${3:-}"
+  local part="${out%.jpg}.part-$$.jpg"
+  local status=0
+  if [ -n "$crop" ]; then
+    # magick: crop to exact region, reset page geometry, downscale to fit max dim
+    # while preserving aspect, encode JPEG at the tier quality.
+    magick "$src" -crop "$crop" +repage \
+      -resize "${__SNAP_DIM}x${__SNAP_DIM}>" \
+      -quality "$__SNAP_Q" "$part" || status=$?
+  else
+    sips -Z "$__SNAP_DIM" -s format jpeg -s formatOptions "$__SNAP_Q" "$src" --out "$part" >/dev/null || status=$?
+  fi
+  if [ "$status" -ne 0 ] || [ ! -s "$part" ]; then
+    rm -f "$part"
+    echo "snap: encoding $src failed (exit $status, no JPEG written)" >&2
+    return 1
+  fi
+  mv -f "$part" "$out"
+}
+
 # --- snap: full-frame capture ----------------------------------------------
 snap() {
   local label="$1"
   local tier="${2:-default}"
   __snap_resolve_tier "$tier"
   local out; out=$(__snap_out_path "$label")
-  local tmp; tmp=$(mktemp -t snap-raw).png
-  if ! __snap_capture_raw "$tmp"; then rm -f "$tmp"; return 1; fi
-  sips -Z "$__SNAP_DIM" -s format jpeg -s formatOptions "$__SNAP_Q" "$tmp" --out "$out" >/dev/null
-  rm -f "$tmp"
+  local raw; raw=$(mktemp -t snap-raw) || return 1
+  if ! __snap_capture_raw "$raw"; then rm -f "$raw"; return 1; fi
+  if ! __snap_encode "$raw" "$out"; then
+    echo "snap: raw capture kept at $raw" >&2
+    return 1
+  fi
+  rm -f "$raw"
   echo "$out"
 }
 
 # --- snap_post: post-process an already-captured raw file -------------------
-# Use after mcp__playwright__browser_take_screenshot wrote a raw file to disk.
-# Downscales + JPEG-encodes, deletes the raw, echoes final path.
+# Use after mcp__playwright__browser_take_screenshot wrote a raw file to
+# <ABS worktree>/.vitrinka/mcp/<name> (the only place claude-guards lets a
+# browser-MCP capture land). Downscales + JPEG-encodes, echoes the final path,
+# and deletes the raw only once the JPEG is written; on failure the raw stays.
 snap_post() {
   local raw="$1"
   local label="$2"
@@ -98,8 +128,8 @@ snap_post() {
   fi
   __snap_resolve_tier "$tier"
   local out; out=$(__snap_out_path "$label")
-  sips -Z "$__SNAP_DIM" -s format jpeg -s formatOptions "$__SNAP_Q" "$raw" --out "$out" >/dev/null
-  rm -f "$raw"
+  __snap_encode "$raw" "$out" || return 1
+  [ "$raw" -ef "$out" ] || rm -f "$raw"
   echo "$out"
 }
 
@@ -126,14 +156,13 @@ snap_region() {
   fi
   __snap_resolve_tier "$tier"
   local out; out=$(__snap_out_path "$label")
-  local tmp; tmp=$(mktemp -t snap-raw).png
-  if ! __snap_capture_raw "$tmp"; then rm -f "$tmp"; return 1; fi
-  # magick: crop to exact region (x,y,w,h), reset page geometry, downscale to fit
-  # max dim while preserving aspect, encode JPEG at the tier quality.
-  magick "$tmp" -crop "${w}x${h}+${x}+${y}" +repage \
-    -resize "${__SNAP_DIM}x${__SNAP_DIM}>" \
-    -quality "$__SNAP_Q" "$out"
-  rm -f "$tmp"
+  local raw; raw=$(mktemp -t snap-raw) || return 1
+  if ! __snap_capture_raw "$raw"; then rm -f "$raw"; return 1; fi
+  if ! __snap_encode "$raw" "$out" "${w}x${h}+${x}+${y}"; then
+    echo "snap_region: raw capture kept at $raw" >&2
+    return 1
+  fi
+  rm -f "$raw"
   echo "$out"
 }
 
@@ -165,9 +194,7 @@ snap_post_region() {
   fi
   __snap_resolve_tier "$tier"
   local out; out=$(__snap_out_path "$label")
-  magick "$raw" -crop "${w}x${h}+${x}+${y}" +repage \
-    -resize "${__SNAP_DIM}x${__SNAP_DIM}>" \
-    -quality "$__SNAP_Q" "$out"
-  rm -f "$raw"
+  __snap_encode "$raw" "$out" "${w}x${h}+${x}+${y}" || return 1
+  [ "$raw" -ef "$out" ] || rm -f "$raw"
   echo "$out"
 }

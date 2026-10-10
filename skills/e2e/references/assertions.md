@@ -20,7 +20,7 @@ The catalog is **closed** — only the kinds below are legal. Need a new shape? 
 
 ## Test envelope
 
-Lean header (replaces the old 13-key schema) — just enough for traceability + the determinism gate:
+Lean header — just enough for traceability + the determinism gate:
 
 ```ts
 /*
@@ -60,7 +60,7 @@ test.afterEach(async ({ apiHelpers }) => { await apiHelpers.deleteMatching('e2e-
 */
 describe('checkout', () => {
   beforeEach(async () => { await api.reset('checkout') })   // project E2E API client from .e2e.json
-  it('places an order', async () => {
+  it('places an order @e2e-checkout', async () => {   // mocha has no tags: the @e2e-<slug> tag rides in the title for --mochaOpts.grep
     // … act + assert (templates below) …
   })
   afterEach(async () => { await api.reset() })
@@ -149,7 +149,7 @@ If the project exposes no API client/log, dual-verify degrades to client-only fo
 
 A spec must pass **run alone, in any order, against a fresh backend**. Five rules — `bin/ast-lint.mjs` enforces the bold ones structurally:
 
-1. **Parallel-by-default.** PW: `test.describe.configure({ mode: 'parallel' })` after imports. WDIO: declare `RUNNER-ISOLATED: true` (or `WDIO-MAX-INSTANCES: 1` / `ACTOR-SESSIONS:` for multi-actor) and reset/seed before the spec.
+1. **Parallel-by-default.** PW: `test.describe.configure({ mode: 'parallel' })` after imports. WDIO: declare `RUNNER-ISOLATED: true` (or `WDIO-MAX-INSTANCES: 1` / `ACTOR-SESSIONS: <actor>=device, <actor>=api|browser` for multi-actor — one device actor only, `references/appium-driver.md` § Multi-actor journeys) and reset/seed before the spec.
 2. **No order-coupling.** Banned: `test.describe.serial(` / chained `.serial(`; **top-level `let`/`var`** holding shared state (use `const` or fixtures). Coupled multi-step flows → emit ONE test containing all steps, never split.
 3. **Seed your own data, scoped by the journey slug** (`e2e-<slug>-…`). Slugs are deterministic and greppable in CI logs; UUIDs are not.
 4. **No real clock / RNG in assertions.** Banned in assertion args: `Date.now()`, `new Date()`, `Math.random()`, `crypto.randomUUID()`, `performance.now()`. For app-generated values, **capture-and-rebind** (read into a `const`, assert against it) or assert a **shape regex** (`/^BK-\d{8}$/`), never a literal.
@@ -161,17 +161,17 @@ Preference: **`getByRole` > `getByTestId`** (Web) · **accessibility-id `~testID
 
 - **Selectors:** raw CSS/XPath in `.locator()`, `.nth(n)`, `getByText('literal')` (use `/regex/i`), `>> text=` engine pipes.
 - **Code execution:** `eval(` / `new Function(`, `page.evaluate(<interpolated template>)` or `page.evaluate(variable)`, `browser_run_code_unsafe`.
-- **Host access:** `child_process` / `spawn`/`execSync`, `fs` import, `process.env.X` direct reads, cross-origin `fetch` (outside `cfg.allowedOrigins`).
+- **Host access:** `child_process` / `node:child_process` in any import or require form, a call of any of its execution functions (`exec`, `execFile`, `execSync`, `execFileSync`, `spawn`, `spawnSync`, `fork`), `fs` / `fs/promises` (bare or `node:`) in any import or require form, `process.env.X` direct reads, cross-origin `fetch` (a parsed origin not equal to one in `cfg.allowedOrigins`; an unparseable URL, or a URL literal with an escape sequence, is refused).
 - **Secret leaks:** `localStorage`/`sessionStorage` get/set with token/secret/key/password names; `console.log` of token/secret/key/password/cookie vars.
 
 ## Run-it-alone gate
 
-After emit, prove the spec passes standalone (no sibling pre-seeded state):
+After emit, prove the spec passes standalone (no sibling pre-seeded state). `<runner>` is the stack's configured `.e2e.json` `stacks.<stack>.runner`, which already names the test command (and, for WDIO, its config) — append only runner options, never the command again:
 
 ```bash
-# Playwright
-<runner> playwright test --grep "@e2e-<slug>" --workers=1
-# Appium/WDIO
-<runner> wdio run <wdio.conf> --spec <specPath> --mochaOpts.grep "@e2e-<slug>"
+# Playwright — <runner> = stacks.web.runner
+<runner> --grep "@e2e-<slug>" --workers=1
+# Appium/WDIO — <runner> = stacks.mobile.runner; the tag is in the it() title
+<runner> --spec <specPath> --mochaOpts.grep "@e2e-<slug>"
 ```
 GREEN → keep. RED → the spec depends on sibling state: mark `INDEPENDENT: false`, `.fixme()`, and report.

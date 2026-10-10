@@ -62,7 +62,7 @@ The tree says *what's tappable*; the **source** says *what it does*. In the scre
 - **XCUITest page source can contain hidden, non-foregrounded screens** (stacked routes). An element present in the XML is NOT necessarily on screen — always gate discovery and assertions on `await el.isDisplayed()`, or you'll match a backgrounded route and call a stale screen "covered".
 - `label`/text selectors only when the visible copy IS the behavior under test (an i18n label that changes per locale is not a stable selector).
 
-> VALIDATE on first real run: confirm the type/attribute names above against FixIt `apps/client` on a live simulator (iOS XCUITest vs Android uiautomator2 differ), and tighten selectors from the observed tree.
+> VALIDATE on first real run: confirm the type/attribute names above against the project's Expo app on a live simulator (iOS XCUITest vs Android uiautomator2 differ), and tighten selectors from the observed tree.
 
 ## Transactional flow checklist
 
@@ -84,7 +84,7 @@ Then drive in this order:
 3. Capture pre-mutation UI state on every affected surface, not just the current screen.
 4. Perform the mutation from the actor that owns it.
 5. Assert backend/API state first, then every affected UI surface.
-6. For realtime requirements, use separate actor sessions when the feature depends on live delivery, locking, duplicate prevention, chat arrival, or race behavior. Account switching in one session is only acceptable for non-realtime confirmation after the event is already persisted.
+6. For realtime requirements, give each actor its own session per **Multi-actor journeys** below (one native UI actor; the others through the backend or a browser) when the feature depends on live delivery, locking, duplicate prevention, chat arrival, or race behavior. Account switching in one session is only acceptable for non-realtime confirmation after the event is already persisted.
 7. For business modes with different rails, assert both presence and absence. Example shape: mode A shows payment/invoice/ledger rows and creates payment records; mode B intentionally shows direct-settlement/off-platform rows and creates no payment records.
 8. Re-open affected surfaces through different navigation paths: list → detail, activity → detail, chat → linked inquiry, profile/company → history item. A route found in page source but not displayed is a failure — hidden stacked routes can mask stale navigation.
 
@@ -100,12 +100,16 @@ For Stripe, Apple Pay, browser redirects, or any native/external sheet:
 
 ## Multi-actor journeys
 
-Realtime and concurrency flows model actors explicitly:
+Realtime and concurrency flows model actors (`customer`, `worker`, `admin`, …) explicitly, in the one shape the mobile lane supports — it owns ONE simulator and ONE Appium session on it (SKILL.md § Lane scheduler: two Appium sessions on one device corrupt state, and a second simulator is never booted):
 
-- `customer`, `worker`, `admin`, etc. each own a separate Appium session.
+- **One native UI actor** drives the app on the device through the lane's Appium session.
+- **Every other actor goes through the backend:** the project E2E API client acting as that actor's own authenticated identity, calling the same endpoints the product's client would — never a DB write that skips the endpoint under test. The native actor's UI must then show the effect.
+- **Or a second UI actor in a browser,** where the product has a web client for that role: a browser session (a WDIO multiremote browser capability, or the web stack's Playwright) — never a second Appium session. Driven live, it holds the web lane's browser semaphore.
+- Declare the map in the spec header, e.g. `ACTOR-SESSIONS: customer=device, worker=api` (or `worker=browser`).
 - Actors share fixture metadata from the E2E reset/seed API, not WDIO globals.
 - Synchronize cross-actor steps with barriers: "customer submitted", "worker list refreshed", "customer accepted", etc.
 - Never fake concurrency by switching accounts in one session when the requested behavior is realtime, locking, duplicate offer prevention, chat delivery, or race handling.
+- **Two simultaneous native UI actors are blocked.** A journey whose behavior needs two actors on the native app at once (both racing or watching native screens, with no web client for either role) cannot run on this lane: mark it `blocked: needs-two-native-actors` in `journeys.md` and report it — never run it, never boot a second simulator or open a second Appium session, never fall back to account switching.
 
 ## Runner-backed determinism
 

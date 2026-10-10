@@ -1,23 +1,26 @@
 ---
-disable-model-invocation: true
 name: distill
-description: "Rewrite an instruction file (skill, command, doc, rule, CLAUDE.md section) token-lean under the house doctrine — reviewer subagent passes to convergence, before/after metrics, confirmed write."
+description: "Use when an instruction file — skill, command, doc, rule or CLAUDE.md section — should be rewritten token-lean: '/distill <name|path>', 'distill this skill', 'make this prompt leaner'."
+disable-model-invocation: true
+codex-ignore: true
 ---
 
-Distill `$ARGUMENTS` — a path, skill name, or command name — into its leanest faithful form. Empty → ask what to distill. Resolve bare names against `~/.claude/skills/` and `~/.claude/commands/`; plugin/marketplace clones are read-only — propose a diff, never write there.
+Distill `$ARGUMENTS` — a path, skill name, or command name — into its leanest faithful form. Empty → ask what to distill.
+
+Resolve the CANONICAL source before reading: a path as given; a bare name against the user-level Claude Code `skills/` and `commands/`, then the current repo's `.claude/`. An installed copy carrying `.toolbox-package.json` is the tools repo's — its source is `skills/<item_id>/` in the the tools repo repo; a symlink's source is its target. Plugin/marketplace clones are read-only — propose a diff, never write there.
 
 ## Doctrine
 
 Write for a very smart model. Per line: would it act differently without this line? No → delete.
 
 - Goal + constraints, not steps. Steps only where order genuinely matters or the operation is fragile (then exact commands, low freedom); high freedom everywhere else.
-- Never explain why an instruction exists, narrate hypotheticals ("if X, that would Y"), or restate what the harness prompt already carries — think-first, verification, self-correction, progress updates, finishing the whole task, scope of the deliverable, writing style, tool-call batching. Not defaults, so one line is legitimate: surgical edits over whole-file rewrites, and test restraint (Fable 5.1 drifts toward both).
+- Never explain why an instruction exists, narrate hypotheticals ("if X, that would Y"), or restate what the harness prompt already carries — check the current one rather than assuming; Claude Code's covers think-first, verification, self-correction, progress updates, finishing the whole task, scope of the deliverable, writing style, tool-call batching. Not defaults, so one line is legitimate: surgical edits over whole-file rewrites, and test restraint.
 - Never instruct the model to echo or explain its reasoning in output.
 - A behavior that resists a short rule gets ONE complete worked example (request, response, one-sentence rationale) instead of more rules. Explicit leave-out lists and keep lists ("don't fix X; report it" / "preserve exactly: …") are followed reliably — prefer them to prose.
 - Compression is token-measured, clarity-first: cut filler, hedging, duplicate statements of one rule. A symbol replaces words only when genuinely fewer tokens and unambiguous ("/" usually qualifies; "→" and invented abbreviations usually don't). Never drop a not/never/only/except. Never add words.
 - Consistent terminology throughout; no time-sensitive facts; references one level deep from SKILL.md; SKILL.md body < 500 lines.
 
-Descriptions (frontmatter) — THE rule for every surface (to-skill, to-command, update-skill point here):
+Descriptions (frontmatter) — THE rule for every surface; update-skill and update-character apply it too:
 - Auto-invocable → `description` is the TRIGGER, not a summary (the property name misleads): third person, ONLY when-to-invoke — the situations, intents, and concrete terms that should fire it. What the skill does belongs in the body; a name that echoes the tool/command it wraps is itself a trigger term. This is the entire standing context cost — every session pays it.
 - Manual-only → `disable-model-invocation: true` (drops it from model context entirely) + a short human-facing description for /help. Never spend description tokens saying "manual only".
 
@@ -25,7 +28,7 @@ Descriptions (frontmatter) — THE rule for every surface (to-skill, to-command,
 
 1. **Baseline.** Read the target (+ its `references/` for a skill). Token estimate per section: `wc -c` ÷ 4 — only relative deltas matter. Kill list: lines that explain why, narrate hypotheticals, or restate defaults.
 
-2. **Reviewer passes.** Dispatch a subagent (session model) with the current text, the Doctrine above, and this brief:
+2. **Reviewer passes.** Dispatch a fresh review agent (the Codex sidekick via the ccx skill when installed, otherwise a subagent on the session model) with the current text, the Doctrine above, and this brief:
 
    > You are an uncompromising instruction editor. Weigh every word. Return the shortest text preserving complete meaning — every instruction, negation (not/never/only/except), exact command, name, and number stays. Delete why-explanations, hypothetical narration, restated default model behavior, filler, hedging, duplicates. Reword to shorter equivalents per the doctrine's compression rule. Return the full rewritten file plus a cut list stating why each cut is safe.
 
@@ -33,6 +36,6 @@ Descriptions (frontmatter) — THE rule for every surface (to-skill, to-command,
 
 3. **Frontmatter.** Apply the description doctrine. Flag any "Manual only:" description that was silently loading every session.
 
-4. **Confirm + write.** Show the final draft, a before/after table (tokens per section, total, % saved), and the cut list. AskUserQuestion: Approve / Tweak / keep original. Never write unconfirmed. On approve: write, commit path-scoped (`chore(skills): distill <name>`).
+4. **Confirm + write.** Show the final draft, a before/after table (tokens per section, total, % saved), and the cut list. AskUserQuestion: Approve / Tweak / keep original. Never write unconfirmed. On approve: write the canonical source in a worktree of its repo — unless that repo's own worktree policy says otherwise — never an installed copy; commit path-scoped (`chore(skills): distill <name>`).
 
-Batch: `$ARGUMENTS` = a directory or `all` → rank by token count, propose the worst offenders, run each through the loop, one confirmation per file.
+Batch: `$ARGUMENTS` = a directory or `all` (every user-level skill and command) → rank by token count, propose the worst offenders, run each through the loop, one confirmation per file.

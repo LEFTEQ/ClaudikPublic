@@ -32,8 +32,8 @@ Copy `scripts/appdocs-images.mjs` from this skill into the target repo's `script
 
 ```sh
 node scripts/appdocs-images.mjs add  <group>/<doc> -v 1 -n payments-start -f shot.png   # place raw + gen .min.webp
-node scripts/appdocs-images.mjs add  … --force                                          # explicit override only
-node scripts/appdocs-images.mjs add  … --no-raw                                         # skip raw placement
+node scripts/appdocs-images.mjs add  … --force                                          # replace the image's whole set; explicit only
+node scripts/appdocs-images.mjs add  … --no-raw                                         # WebP + .noraw marker, no raw
 node scripts/appdocs-images.mjs bump <group>/<doc> --from 1 --to 2 [name…]              # start v2 from v1 images
 node scripts/appdocs-images.mjs list [group[/doc]]                                      # inventory by version
 node scripts/appdocs-images.mjs check                                                   # naming + raw/min pairing
@@ -42,6 +42,7 @@ node scripts/appdocs-images.mjs prune                                           
 
 Rules the utility enforces (don't work around them):
 - name regex `v<int>.<kebab-name>(.min).<ext>` — anything else fails `check`;
-- no silent overrides — existing target requires `--force`;
-- every `.min.webp` should have its raw sibling (reported by `check`; `--no-raw` adds a `.noraw` marker file so `check` stays green);
+- no silent overrides — an existing WebP, raw or marker for that version/name requires `--force`, which replaces the whole set: `--no-raw` removes every published raw, a raw removes the `.noraw` marker;
+- `add` is all-or-nothing — it encodes in a staging dir and publishes only the complete set, so a failed add (no encoder, failed encode) changes nothing and rerunning it is the recovery;
+- every `.min.webp` has exactly one of its raw sibling or a `.noraw` marker (`--no-raw` writes the marker) — `check` fails on neither and on both;
 - empty directories are noise — `prune` removes them.

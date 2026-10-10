@@ -30,13 +30,41 @@ if (cfgFile) {
   }
 }
 
+// The http(s) origin of s, or null when s does not parse as an http(s) URL.
+function httpOrigin(s) {
+  let url
+  try {
+    url = new URL(s)
+  } catch {
+    return null
+  }
+  return url.protocol === 'http:' || url.protocol === 'https:' ? url.origin : null
+}
+
+// Allowed origins are compared as parsed origins, never as string prefixes: a prefix
+// admits https://app.example.attacker.test, https://app.example@attacker.test, and
+// :30001 for :3000. An entry that is not an http(s) URL is a broken invocation.
+const allowedOrigins = new Set()
+if (cfg.allowedOrigins !== undefined && !Array.isArray(cfg.allowedOrigins)) {
+  console.error(`ast-lint.mjs: cfg allowedOrigins must be an array of http(s) origins (${cfgFile})`)
+  process.exit(2)
+}
+for (const entry of cfg.allowedOrigins || []) {
+  const origin = typeof entry === 'string' ? httpOrigin(entry) : null
+  if (!origin) {
+    console.error(`ast-lint.mjs: cfg allowedOrigins entry is not an http(s) URL: ${JSON.stringify(entry)} (${cfgFile})`)
+    process.exit(2)
+  }
+  allowedOrigins.add(origin)
+}
+
 const violations = []
 const v = (rule, msg) => violations.push(`${rule}: ${msg}`)
 
 {
   // TypeScript specs (Playwright or Appium/WebdriverIO) — regex-based first pass
-  // (sufficient for catching obvious patterns; the typescript-compiler-API upgrade
-  // is a v2 task per design doc Section 12).
+  // (sufficient for catching obvious patterns; a typescript-compiler-API pass is
+  // an open question in DESIGN.md).
 
   // no-dynamic-eval
   if (/\beval\s*\(/.test(src)) v('no-dynamic-eval', 'eval(')
@@ -49,23 +77,45 @@ const v = (rule, msg) => violations.push(`${rule}: ${msg}`)
   // no-unsafe-mcp
   if (/browser_run_code_unsafe/.test(src)) v('no-unsafe-mcp', 'browser_run_code_unsafe')
 
-  // no-shell
-  if (/from\s+['"]child_process['"]|require\s*\(\s*['"]child_process['"]\s*\)/.test(src)) v('no-shell', 'child_process import')
-  if (/\b(spawn|execSync)\s*\(/.test(src)) v('no-shell', 'spawn()/execSync()')
+  // A load of a module whose specifier matches the pattern, bare or `node:`-prefixed:
+  // import/export … from (with or without a space), a side-effect import, require()
+  // or dynamic import(), any quote including backticks. The specifier is what is
+  // matched, so whatever bindings or aliases it lands in are covered.
+  const importsModule = specifier => {
+    const quoted = String.raw`['"\`](?:node:)?(?:${specifier})['"\`]`
+    return new RegExp(String.raw`\bfrom\s*${quoted}|\bimport\s*${quoted}|\b(?:require|import)\s*\(\s*${quoted}\s*\)`)
+  }
 
-  // no-fs
-  if (/from\s+['"](node:)?fs['"]|require\s*\(\s*['"](node:)?fs['"]\s*\)/.test(src)) v('no-fs', 'fs import')
+  // no-shell — child_process in any load form; plus a call of any of its execution
+  // functions, however the function was reached. A member `.exec(` is RegExp/SQL far
+  // more often than a shell, so only a bare `exec(` counts there — a namespace or
+  // default import (`cp.exec`) is already caught by the import check.
+  if (importsModule('child_process').test(src)) v('no-shell', 'child_process import')
+  const shellCall = src.match(/(?<![\w$])(?:execFileSync|execFile|execSync|spawnSync|spawn|fork)\s*\(|(?<![\w$.])exec\s*\(/)
+  if (shellCall) v('no-shell', `child_process call: ${shellCall[0].replace(/\s*\($/, '')}()`)
+
+  // no-fs — fs and fs/promises in any load form
+  if (importsModule('fs(?:/promises)?').test(src)) v('no-fs', 'fs import')
 
   // no-raw-env
   if (/\bprocess\.env\.[A-Z_]+/.test(src)) v('no-raw-env', 'process.env.* direct read')
 
-  // no-cross-origin-fetch
-  const fetchMatches = [...src.matchAll(/\bfetch\s*\(\s*['"`](https?:\/\/[^'"`]+)['"`]/g)]
+  // no-cross-origin-fetch — absolute (any case) and protocol-relative URLs; the parsed
+  // origin must equal an allowed one, and a URL that does not parse is refused.
+  const fetchMatches = [...src.matchAll(/\bfetch\s*\(\s*['"`]((?:https?:)?\/\/[^'"`]+)['"`]/gi)]
   for (const m of fetchMatches) {
     const url = m[1]
-    if (!(cfg.allowedOrigins || []).some(o => url.startsWith(o))) {
-      v('no-cross-origin-fetch', `fetch to disallowed origin: ${url}`)
+    // The check reads the literal's source text, but JavaScript first
+    // processes its escapes (`\@`, `\x40`, `\u0040`), so the URL fetched
+    // can differ from the one parsed here: a literal with any escape is
+    // refused, never decoded.
+    if (url.includes('\\')) {
+      v('no-cross-origin-fetch', `fetch URL literal with an escape sequence: ${url}`)
+      continue
     }
+    const origin = httpOrigin(url)
+    if (!origin) v('no-cross-origin-fetch', `fetch to a URL that is not absolute http(s): ${url}`)
+    else if (!allowedOrigins.has(origin)) v('no-cross-origin-fetch', `fetch to disallowed origin: ${origin} (${url})`)
   }
 
   // no-storage-secret
@@ -95,7 +145,7 @@ const v = (rule, msg) => violations.push(`${rule}: ${msg}`)
   // ─── Determinism rules (references/assertions.md) ───
 
   // Header escape hatch — when `INDEPENDENT: false` is declared, the determinism rules
-  // are waived for this file. The orchestrator routes the test to Track C anyway.
+  // are waived for this file; its body is .fixme()/.skip()'d anyway (references/assertions.md).
   const independentFalse = /^\s*\*?\s*INDEPENDENT\s*:\s*false\b/mi.test(src)
 
   // require-isolation-metadata

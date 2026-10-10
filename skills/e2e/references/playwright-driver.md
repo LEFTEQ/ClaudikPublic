@@ -4,12 +4,11 @@
 
 Playwright MCP **MUST** run with `--isolated`. Without it, the browser process locks and all subsequent tool calls fail with "Browser is already in use."
 
-**Recovery if locked:**
-```bash
-pkill -f "mcp-chrome-for-testing"
-sleep 1
-# Then retry navigation
-```
+**Recovery if locked:** `browser_close`, then retry the navigation. If a stale browser
+process still holds the profile, report it (PID, start time, parent) and stop — kill it
+only on an explicit human request, by that one PID, after re-checking its start time
+and that its parent is this session's MCP server. Never `pkill -f` a browser pattern:
+every other session's browser matches it too.
 
 ## Available tools
 
@@ -55,11 +54,21 @@ browser_wait_for → 3s (auth + redirect)
 browser_navigate → page URL
 browser_wait_for → 4s (data load, wait for "Connecting..." to disappear)
 browser_resize → first breakpoint
-browser_take_screenshot → filename "<ABS worktree>/.vitrinka/mcp/{routeId}-{width}.png"
+browser_take_screenshot → filename "<ABS worktree>/.vitrinka/mcp/raw-{routeId}-{width}.png"
+Bash: snap_post "<ABS worktree>/.vitrinka/mcp/raw-{routeId}-{width}.png" {routeId}-{width}
 browser_resize → next breakpoint
-browser_take_screenshot → filename "<ABS worktree>/.vitrinka/mcp/{routeId}-{width}.png"
+browser_take_screenshot → filename "<ABS worktree>/.vitrinka/mcp/raw-{routeId}-{width}.png"
+Bash: snap_post "<ABS worktree>/.vitrinka/mcp/raw-{routeId}-{width}.png" {routeId}-{width}
 ... repeat for all breakpoints
 ```
+
+A browser-MCP capture lands only in the work tree's `.vitrinka/mcp/` (ignored
+globally; claude-guards `browser:screenshot-dir` refuses any other path), spelled
+absolute — a relative name resolves in the session's launch directory, which is
+another checkout when you work in a worktree. `snap_post` (`references/snap.sh`,
+sourced in the worktree) turns that raw into the evidence JPEG under
+`.e2e/.screenshots/` and deletes the raw only once the JPEG is written; a non-zero
+exit means no evidence was produced and the raw is still there.
 
 ## Functional test pattern
 ```
@@ -94,8 +103,9 @@ browser_console_messages → check for new errors
      // or use Node.js fs to write directly
    }
 
-3. Save the base64 data via Bash:
-   echo "<base64>" | base64 -d > .e2e/.screenshots/file.png
+3. Save the base64 data via Bash as the raw, then post-process it like any capture:
+   echo "<base64>" | base64 -d > "<ABS worktree>/.vitrinka/mcp/raw-{routeId}-{width}.png"
+   snap_post "<ABS worktree>/.vitrinka/mcp/raw-{routeId}-{width}.png" {routeId}-{width}
 ```
 
 **Alternative:** if screenshots consistently fail, use `browser_snapshot` as the primary evaluation tool — it never timeouts. Reserve screenshots for the final report only.
@@ -104,7 +114,7 @@ browser_console_messages → check for new errors
 - After `navigate`, always wait 3-4s for data loading; apps often show "Connecting..." or a spinner during initial load
 - Geist fonts from Vercel CDN may timeout — use CDP fallback (above)
 - Session expires after ~15 min of inactivity — re-login if needed
-- `mkdir -p` the screenshot directory before the first screenshot
+- `mkdir -p "<ABS worktree>/.vitrinka/mcp"` before the first screenshot (`snap_post` creates `.e2e/.screenshots` itself)
 - `fullPage: true` for scrollable pages
 - `browser_snapshot` (not screenshot) when you need to interact with elements
 - cmdk/Command components: `page.locator('[cmdk-item]').click({ force: true })` — standard clicks may fail due to re-rendering

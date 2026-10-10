@@ -1,7 +1,7 @@
 ---
 name: app-docs-capture
 disable-model-invocation: true
-description: "Capture redacted, versioned, annotation-ready app screenshots and wire them into docs pages."
+description: "Use when an app's help or docs pages need screenshots — capturing redacted, pixel-stable, versioned shots of a demo tenant or a login-walled vendor console, annotating them in code with overlay coordinates, and wiring them into versioned docs routes."
 ---
 
 # app-docs-capture — screenshots for client docs
@@ -11,7 +11,7 @@ Deliverable: screenshots safe to publish, pixel-stable, versioned, annotated in 
 ## Laws (all phases)
 
 - **Sandbox/demo tenant first.** Never capture a real client's tenant if a demo exists; if you must, get explicit approval and redact everything personal.
-- **Fixed viewport** (default 1440×900) for every shot in a set — annotation coordinates and visual consistency depend on it.
+- **Fixed viewport** for every shot in a set — annotation coordinates and visual consistency depend on it. Desktop default: **1440×810 viewport shots**; full-page only when the scroll length is the point, and say so.
 - **Annotations live in code**: store the element's CSS-px rect next to the screenshot reference; render rings/badges as HTML overlays converted to %. Never draw into the image.
 - **Redact before anything ships**: personal emails, names, addresses, phone numbers, API keys/tokens. Company-owned public info (brand email) may stay.
 - **Verify every shot by Reading the image** after capture — right screen, right state, nothing sensitive. Dense regions get cropped and enlarged (`sips` or the capture script) before judging; a full-frame glance misses small text. Non-delegable.
@@ -29,7 +29,7 @@ Deliverable: screenshots safe to publish, pixel-stable, versioned, annotated in 
 1. **Plan** — list the states to capture (one coherent state per shot), flow order, which elements each doc step highlights, and the target `<docGroup>/<version>/<docName>` route.
 2. **Capture + redact** → `references/capture-redaction.md`. Lazy-image forcing, cookie-banner dismissal, DOM-replacement and pixel-patch redaction, presentational state reconstruction, the Next.js dev image-cache trap.
 3. **Measure + annotate** → `references/overlay-annotations.md`. Measure `getBoundingClientRect()` in the same session that shot the screen; wire the overlay component; verify ring alignment on the rendered page.
-4. **Vendor/third-party UIs behind login** → `references/vendor-login-cdp.md`. Google-SSO blocks automated sign-in; use the real-browser CDP ladder.
+4. **Vendor/third-party UIs behind login** → `references/vendor-login.md`. Sign in through the Onyx browser; a step only a human can type (2FA, SSO consent, card reader) goes through the codrive skill when installed — never switch browsers.
 5. **Place + wire** — run the structure utility to place raws + generate `.min.webp`, hook images into the docs pages, keep the group index auto-generated from the docs data (`references/docs-structure.md`).
 6. **Verify** — screenshot the RENDERED pages to confirm alignment and freshness (beware optimizer caches), run the repo's checks.
 

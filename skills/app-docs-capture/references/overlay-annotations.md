@@ -7,7 +7,7 @@ Annotations are highlight rings + numbered badges rendered as absolutely positio
 Measure in the SAME browser session that shot the screen, at the exact scroll state of the shot — eyeballing drifts 20px:
 
 ```js
-const r = el.getBoundingClientRect();       // CSS px in the 1440×900 viewport
+const r = el.getBoundingClientRect();       // CSS px in the 1440×810 viewport
 // {x, y, w: r.width, h: r.height} → store rounded
 ```
 
@@ -19,7 +19,7 @@ const r = el.getBoundingClientRect();       // CSS px in the 1440×900 viewport
 
 ```ts
 export const SCREENSHOT_W = 1440;
-export const SCREENSHOT_H = 900;
+export const SCREENSHOT_H = 810;
 interface Annotation { x: number; y: number; w: number; h: number; badge?: number }
 interface Screenshot { src: string; alt: string; caption?: string; annotations?: Annotation[] }
 ```
@@ -44,7 +44,7 @@ interface Screenshot { src: string; alt: string; caption?: string; annotations?:
 ```
 
 - The −6/+12 padding makes the ring breathe around the element.
-- Full-page screenshots (non-1440×900 aspect) need their own W/H pair — the % math only works against the actual image dimensions.
+- Full-page screenshots (non-1440×810 aspect) need their own W/H pair — the % math only works against the actual image dimensions.
 
 ## Verification (mandatory)
 
