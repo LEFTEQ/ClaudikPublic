@@ -107,13 +107,6 @@ Tell the user in one line:
 - Screenshots go to `<ABS worktree>/.vitrinka/mcp/<name>`, spelled absolute: a
   relative name resolves in the session's launch dir, not the worktree
   (claude-guards `browser:screenshot-dir` refuses it there).
-- With agent teams on, a NAMED spawn is a teammate session with its own
-  `CLAUDE_CODE_SESSION_ID`, and the guard wants its onyx `browser_start` under that id; its playwright / chrome-devtools
-  may still reach a different browser. Before an onyx `browser_fill`, the lane checks
-  that `browser_tabs` shows the page it is driving; on a mismatch the lead signs in.
-- Codex sees no pixels, so a capturing lane proves every shot is non-blank before it
-  adopts it (distinct sizes or hashes; one byte-size repeated across scenarios means
-  blank frames). vt-723 (2026-10-09) published 35 identical blank shots as PASS evidence.
 - Never stop or restart a browser a lane is using. Claude also leaves the simulator
   or the computer-use app alone while a lane is driving it.
 

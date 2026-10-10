@@ -72,4 +72,4 @@ In a fresh session:
   continue:  /continue <slug>
 ```
 
-When `$VITRINKA_SESSION_LAUNCHER` is set and the user picked a fresh session, run `sh -c '${VITRINKA_SESSION_LAUNCHER:?} "$@"' _ <slug> <where>` instead (`sh -c` splits the flags the variable may carry in any shell, and an unset one exits non-zero; it opens the next cmux tab and runs `/continue <slug>` there): exit 0 → print its receipt line in place of the `In a fresh session` block; unset or non-zero → print the block as above.
+When the user picked a fresh session, run `toolbox fleet continue --focus <slug> <where>` instead (it opens the next cmux tab and runs `/continue <slug>` there; never wrap it in `sh -c '${VITRINKA_SESSION_LAUNCHER…}'`, which Claude Code's rm check blocks): exit 0 → print its receipt line in place of the `In a fresh session` block; non-zero or not found → print the block as above.

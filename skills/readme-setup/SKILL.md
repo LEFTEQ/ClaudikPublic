@@ -1,6 +1,6 @@
 ---
 name: readme-setup
-description: "Interactive intention-first setup of a project's README.md + CLAUDE.md: explore, interview for intent, converge with what exists, ship."
+description: "Use when a project's README.md and CLAUDE.md should be written or converged so they say what the project is for — '/readme-setup', 'set up the README', 'write the CLAUDE.md', 'README only' — through exploration, an intent interview and a merge with what exists."
 disable-model-invocation: true
 ---
 
@@ -18,9 +18,11 @@ converge-and-merge rules, truth rules. Read it before step 3.
 
 ## 1. Explore before asking
 
-Read in ONE batch: existing README / CLAUDE.md / AGENTS.md, `.claude/memory/`,
-`docs/`, marketing or store copy (`apps/web`, landing pages), docs sites,
-top-level layout, recent release notes / CHANGELOG, open PR titles. Build the
+Survey only what the two files cover: the existing README / CLAUDE.md /
+AGENTS.md, `.claude/memory/`, the docs they link to, public copy where the repo
+holds it (marketing site, store listing, landing pages), the top-level layout,
+the latest release notes / CHANGELOG entries and open PR titles. Open further
+files only to check a claim you are about to make, never to map the tree. Build the
 intention picture and list every claim you could NOT infer: personas and which
 is the CURRENT focus, the problem in the owner's words, per-module maturity,
 deployment targets and what each makes non-negotiable, monetization, security
@@ -51,19 +53,23 @@ Ambiguous or big scope → /qna.
 
 ## 3. Author under the contract
 
-Write both files. Merge surviving content into the contract's shapes: targeted
+Write the files in scope — both by default, only the one "README only" or
+"CLAUDE.md only" names; the other is read for consistency, never edited.
+Merge surviving content into the contract's shapes: targeted
 edits when most of a file stays, a rewrite only when most of it changes. Verify
 every claim against the tree while writing; fix stale facts found en route in
 the same change.
 
 ## 4. Verify and ship
 
-Fork-subagent review of the result: factual claims vs the tree; content lost
+A fresh review agent (the Codex sidekick via the ccx skill, when installed)
+reviews the result, briefed with the authored files, their previous versions,
+the out-of-scope file (read only) and the interview answers: factual claims vs the tree; content lost
 from the previous versions (negations, exact commands, laws, runbooks);
 intention fidelity vs the interview and pasted material; consistency between
 the two files and any public copy (marketing site, store listing). Fix its
 findings inline. Do not stop for approval between review and shipping; the
 interview was the approval. Ship through the repo's own change flow (worktree
-+ PR where that is the law). Summary lists: what changed per file, every
++ PR where that is the law). Summary lists: what changed per authored file, every
 deliberately dropped line, stale facts corrected, follow-ups found but out of
 scope.

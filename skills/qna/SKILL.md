@@ -1,6 +1,7 @@
 ---
 name: qna
 description: "Use when the user wants to be walked through open decisions before building — '/qna', 'ask me', 'walk me through the options', 'let's settle this' — or when several calls must be settled and a vitrinka brainstorm board is overkill."
+codex-ignore: true
 ---
 
 # /qna — Interactive Questionnaire
@@ -40,9 +41,9 @@ Question craft:
 
 When confidence on a fork is low (stale training data, fast-moving library, hard tradeoff you'd otherwise answer from memory), say so and make research one of that question's options:
 
-> `{"label": "Research this first", "description": "Low confidence here — spin /research (4 parallel subagents, ~2-3 min, costs 3-8× a normal answer) and re-ask with grounded options."}`
+> `{"label": "Research this first", "description": "Low confidence here — research it with parallel subagents (~2-3 min, costs 3-8× a normal answer) and re-ask with grounded options."}`
 
-If picked: Read `~/.claude/skills/research/SKILL.md` and follow it, scoped to that sub-question (pass it as the input). On return, re-present the fork with options rewritten from the findings, citing sources in the descriptions. Continue the questionnaire.
+If picked: invoke the research skill when it is installed, scoped to that sub-question (pass it as the input); otherwise do the research inline with parallel subagents, each on one angle of the sub-question. On return, re-present the fork with options rewritten from the findings, citing sources in the descriptions. Continue the questionnaire.
 
 Never dispatch research without the user picking it; never refuse it when they ask.
 
@@ -59,7 +60,7 @@ When the forks are settled, deliver in-conversation:
 
 ### 5. Build — directly
 
-Implement in the same session straight from the synthesis (worktree if a branch is warranted). Do NOT write a separate implementation plan document — in-session task tracking is fine; a committed plan file only if explicitly requested.
+Implement in the same session straight from the synthesis (create a worktree when a branch is warranted). Do NOT write a separate implementation plan document — in-session task tracking is fine; a committed plan file only if explicitly requested.
 
 ## Principles
 
@@ -72,5 +73,5 @@ Implement in the same session straight from the synthesis (worktree if a branch 
 ## When NOT to use
 
 - Purely visual forks (competing layouts, design directions) → `vitrinka:brainstorming`.
-- Open research question with no decision to walk → `/research` directly.
+- Open research question with no decision to walk → the research skill directly, when it is installed.
 - Challenging a claim already on the table → `/push-back`.

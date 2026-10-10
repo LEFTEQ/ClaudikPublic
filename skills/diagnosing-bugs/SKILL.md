@@ -1,6 +1,6 @@
 ---
 name: diagnosing-bugs
-description: "Use when the user says 'diagnose' or 'debug this', reports wrong output, intermittent failures or something slow, and the cause isn't visible after a first look. NOT for dev-environment/tooling failures (EPERM, unreachable hosts, CLI weirdness) — that's dev-env-troubleshooting."
+description: "Use when the user says 'diagnose' or 'debug this', reports wrong output, intermittent failures or something slow, and the cause isn't visible after a first look — not for dev-environment or tooling failures (EPERM, unreachable hosts, CLI weirdness), which go to dev-env-troubleshooting when that skill is installed."
 ---
 
 # Diagnosing Bugs
@@ -24,11 +24,11 @@ When exploring, read the project CLAUDE.md and committed `.claude/memory/` notes
 1. **Failing test** at whatever seam reaches the bug — unit, integration, e2e.
 2. **Curl / HTTP script** against a running dev server.
 3. **CLI invocation** with a fixture input, diffing stdout against a known-good snapshot.
-4. **Headless browser script** (Playwright) — drives the UI, asserts on DOM/console/network.
+4. **Headless browser loop** — drives the UI, asserts on DOM/console/network: a Playwright spec where the repo runs them, or MCP-driven probes in the Onyx browser (`browser_start` with this session's id first, headless) — never another browser.
 5. **Replay a captured trace** — save a real request/payload/event log, replay through the code path in isolation.
 6. **Throwaway harness** — minimal subset of the system (one service, mocked deps) exercising the bug path with one call.
 7. **Property / fuzz loop** — for "sometimes wrong output", run 1000 random inputs.
-8. **Bisection harness** — bug appeared between two known states: automate "boot at state X, check" so `git bisect run` works. 🚨 Bisection checks out commits — never in the primary checkout; use a `.worktrees/` worktree.
+8. **Bisection harness** — bug appeared between two known states: automate "boot at state X, check" so `git bisect run` works. 🚨 Bisection checks out commits — never in the primary checkout; use a separate worktree (`.worktrees/` where the repo keeps them).
 9. **Differential loop** — same input through old vs new version (or two configs), diff outputs.
 10. **HITL bash script** — last resort; a human must click, so drive _them_ with `scripts/hitl-loop.template.sh` (in this skill dir); captured output feeds back to you.
 
@@ -46,7 +46,7 @@ Goal: a **higher reproduction rate**, not a clean repro. Loop the trigger 100×,
 
 ### When you genuinely cannot build a loop
 
-Stop and say so; list what you tried. Ask for: (a) access to an environment that reproduces it, (b) a redacted captured artifact (HAR, log dump, core dump, timestamped screen recording), or (c) permission to add temporary instrumentation — production instrumentation only with explicit sign-off, never a change the Hard Safety Rules gate. Do **not** hypothesise without a loop.
+Stop and say so; list what you tried. Ask for: (a) access to an environment that reproduces it, (b) a redacted captured artifact (HAR, log dump, core dump, timestamped screen recording), or (c) permission to add temporary instrumentation — production instrumentation only with explicit sign-off, and never a schema change, data mutation or exposed credential just to get a repro. Do **not** hypothesise without a loop.
 
 ### Completion criterion — a tight loop that goes red
 
