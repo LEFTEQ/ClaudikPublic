@@ -187,8 +187,8 @@ the batch and is reported, never acted on with older evidence.
    live Devbox workspace: NEVER `devbox down`/`park`/stop it to free a path — the
    item is blocked, report the workspace (2026-10-15: a tidy `devbox down` took out
    `acme-work-eve-tenant-testing`, another session's live FE+BE+eve stack).
-2. **Project-native teardown wins.** Repo declares one (`AFTER_MERGE_CMD` in
-   `.claude/.claude.git.config` — see `~/.claude/skills/prm/references/config.md` —
+2. **Project-native teardown wins.** Repo declares one (`pr.afterMerge.replaceTeardown` in
+   `toolbox.config.ts` — see `~/.claude/skills/prm/references/config.md` —
    or a `worktree:cleanup` script) → run its dry-run then the real thing.
 3. **Generic fallback.** `docker compose -p wt-<slug> down` — and `wt-<slug>-e2e`,
    the separately-orphaned twin; same for selected ORPHAN stacks. `down -v` ONLY when
