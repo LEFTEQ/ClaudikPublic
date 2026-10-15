@@ -1,12 +1,13 @@
 ---
+name: handoff
 disable-model-invocation: true
 argument-hint: "[slug] [workflow] [auto]"
-description: "Write a handoff for the next session."
+description: "Prepare a resumable handoff for major unfinished work or an explicit user-requested transfer."
 ---
 
 # /handoff — Executable Session Handoff
 
-Package the in-flight work as a self-sufficient handoff a fresh session resumes with `/continue <slug>`. The artifact carries everything — intent, affected apps, prerequisites, phased steps. No memory writes; durable knowledge is the auto-memory system's job.
+Use a resumable handoff for major unfinished work too large for this session or an explicit user-requested transfer; ordinary delegation uses subagents, not handoff files or fleet sessions. Follow the shared size-routing rule. Package the work for `/continue <slug>` with intent, affected apps, prerequisites and phased steps. No memory writes; durable knowledge goes through the `memo` ledger.
 
 ## Arguments — $ARGUMENTS
 
@@ -41,7 +42,7 @@ feature: <project>/<epic id>        # vitrinka epic this work parents to; `none`
 
 ## Ledger
 
-A feature epic is handed back through `/vitrinka:handoff` (`hand_back`); the file runbook is written only for chores and repos without vitrinka. Otherwise a `feature` epic gets the handoff attached and its state set in the same pass: `add_task_ref {kind: file, ref: <path>, meta: {kind: handoff, slug, status}}`, then `update_task {fields: {ledger_state, waiting_on?, next_action}}` — `waiting` (name what) when a prerequisite is unmet, else `scheduled`. Feature work with no epic yet: `create_task {type: epic}` first (contract: `~/.claude/docs/specs/2026-09-05-portfolio-ledger-decisions.md`).
+A feature epic is handed back through `/vitrinka-pm:handoff` (`hand_back`); the file runbook is written only for chores and repos without vitrinka. Otherwise a `feature` epic gets the handoff attached and its state set in the same pass: `add_task_ref {kind: file, ref: <path>, meta: {kind: handoff, slug, status}}`, then `update_task {fields: {ledger_state, waiting_on?, next_action}}` — `waiting` (name what) when a prerequisite is unmet, else `scheduled`. Feature work with no epic yet: `create_task {type: epic}` first (the `portfolio` skill reads these fields).
 
 ## Runbook shape
 
@@ -72,4 +73,6 @@ In a fresh session:
   continue:  /continue <slug>
 ```
 
-When the user picked a fresh session, run `toolbox fleet continue --focus <slug> <where>` instead (it opens the next cmux tab and runs `/continue <slug>` there; never wrap it in `sh -c '${VITRINKA_SESSION_LAUNCHER…}'`, which Claude Code's rm check blocks): exit 0 → print its receipt line in place of the `In a fresh session` block; non-zero or not found → print the block as above.
+When the user picked a fresh session, run `toolbox fleet continue <slug> <where> --why "<why this needs a separate session>"` instead, adding `--gate <kind>:<condition>:<ref>` for what its completion waits on (`pr:merged:owner/repo#N`). It runs `/continue <slug>` in another Auto tab beside the caller in the same cmux window, journals the spawn and wakes this session when the child settles (`docs/fleet.md`, Jobs). Apply the shared plain-tab and single-owner rules (`~/.claude/docs/toolbox/orchestration.md`); no `--team`, grouping, portals or window moves unless explicitly requested. The session command, launch and focus are the person's `~/.config/toolbox/config.json` — never pass `--focus` or wrap it in `sh -c`. Exit 0 → print its receipt in place of the `In a fresh session` block; non-zero or not found → print the fallback block.
+
+A session `fleet continue` started (`$TOOLBOX_JOB` is set) ends its hand back with `toolbox fleet signal handed-back --url <handoff path>`, so its parent is woken now rather than when the session ends.

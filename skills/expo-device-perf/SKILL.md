@@ -5,7 +5,7 @@ description: "Measure and diagnose Expo / React Native performance on physical d
 
 # Expo device perf
 
-`perflab` (a the tools repo applet) owns the lab: the global ledger of physical phones and leases, the native build index keyed by a portable Expo fingerprint, JS bundle export and pack, scenario runs, every trace reader. The project owns the measured interaction (Appium spec, `perfWindow` bracket, scenario table, budgets) in the `perflab` section of its `toolbox.config.ts`. You own the judgment: what to measure, how to read it, which render-cost rule fixes it.
+`perflab` (a the tools repo applet) owns the lab: its devlab layer keeps the machine-global ledger of physical phones and leases; perflab adds the native build index keyed by a portable Expo fingerprint, JS bundle export and pack, scenario runs with their stored plan, every trace reader. The project owns the measured interaction (Appium spec, `perfWindow` bracket, scenario table, budgets) in the `perflab` section of its `toolbox.config.ts`. You own the judgment: what to measure, how to read it, which render-cost rule fixes it.
 
 ## Protocol
 
@@ -18,6 +18,7 @@ description: "Measure and diagnose Expo / React Native performance on physical d
     perflab bundle export --platform <p> --profile perf --label after --json
     perflab pack --native <key> --bundle <sha> --json         # once per bundle -> variant id
     perflab run <scenario>... --device <device> --lease <t> --variant <before> --variant <after> --alternate --repeat 2 --json
+    perflab run --device <device> --lease <t> --resume <runDir> --json   # interrupted: runs the stored plan
     perflab compare <runDir> --json                           # verdict per scenario, step and metric
     perflab lease release <device> --lease <t> --json
 
@@ -29,6 +30,8 @@ Every verb emits `{v, ok, verb, data, diagnostics, next}` under `--json`. **The 
 
 Run `build native`, `bundle export`, `run` and `probe` as background tasks of this session (never nohup) and follow the `^perflab\[` progress lines on stderr.
 
+A repo whose `toolbox.config.ts` declares a readiness gate (`gates`, the tools repo `docs/gate.md`) runs `gate run <name>` after `doctor` and before the first build or run: it proves the project's own prerequisites (target route, permissions, automation, the running build's identity) in seconds instead of one failed campaign attempt at a time, and its pass stays fresh until those inputs or the identity change. A failing gate is a setup blocker, never a measurement.
+
 ## The loop
 
 1. Reproduce on a release perf build on a physical phone; never a dev client, simulator or emulator for a verdict.
@@ -39,7 +42,7 @@ Run `build native`, `bundle export`, `run` and `probe` as background tasks of th
 6. Confirm on the other refresh class (60 vs 120 Hz), the other platform, and once on `build native --kind bundled`.
 7. Land it per rule 27, with the runs on a vitrinka board.
 
-App-wide render sweep: `perflab hazards <appRoot>` lists loop, layer and list sites; review each loop for an ambient gate AND real visibility. Cover every route in the project's route inventory (each persona, every tab, top detail screens, each journey state). Per screen on the 120 Hz Android phone: `probe rest` (its touch at 540,210 must hit nothing: `--tap x,y` an inert spot when a control sits there, or the probe measures the state it opened), plus `probe drag` and `probe fling` when it scrolls. Done when every route has a verdict row (`perflab report`) and each failing screen is fixed or has its own task.
+App-wide render sweep: `perflab hazards <appRoot>` lists loop, layer and list sites; review each loop for an ambient gate AND real visibility. Cover every route in the project's route inventory (each persona, every tab, top detail screens, each journey state). Per screen on the 120 Hz Android phone: `probe rest` (its touch at 540,210 must hit nothing: `--tap x,y` an inert spot when a control sits there, or the probe measures the state it opened), plus `probe drag` and `probe fling` when it scrolls. Done when every route has a verdict row (`perflab report`) and each failing screen is fixed or has its own task. A sweep or a multi-fix A/B is a campaign: plan, controls, repetition policy, the keep/revert chronology, recovery and the evidence bundle are in `references/campaign.md`.
 
 ## Which instrument
 
@@ -90,5 +93,6 @@ Scenario rows override with calibrated numbers; a row named `probe-<kind>-<scree
 - `references/reading-traces.md`: judging a number, attributing a frame.
 - `references/scenario-design.md`: writing or changing a measured scenario.
 - `references/device-lab.md`: picking the phone, the perf profile, platform facts perflab cannot read.
+- `references/campaign.md`: a sweep across routes and phones, kept reproducible, with a worked sweep and its evidence bundle.
 
 Per-project notes: `memo find perf`.

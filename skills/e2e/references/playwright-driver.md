@@ -46,8 +46,9 @@ browser_wait_for → 3s (page load)
 browser_snapshot → get form refs
 browser_fill_form → email + password fields
 browser_click → submit button
-browser_wait_for → 3s (auth + redirect)
+browser_wait_for → text the signed-in page shows (auth + redirect)
 ```
+Take the snapshot before the fill, never after it. A Playwright snapshot prints a filled password field's value, and a login that fails leaves the form on screen. Only test credentials go through `browser_fill_form`, because its input lands in the transcript. A vault credential goes through onyx `browser_fill` ("Filled secrets" in `~/.claude/docs/toolbox/browser.md`).
 
 ## Per-page sweep pattern
 ```

@@ -7,7 +7,7 @@ codex-ignore: true
 
 Distill `$ARGUMENTS` — a path, skill name, or command name — into its leanest faithful form. Empty → ask what to distill.
 
-Resolve the CANONICAL source before reading: a path as given; a bare name against the user-level Claude Code `skills/` and `commands/`, then the current repo's `.claude/`. An installed copy carrying `.toolbox-package.json` is the tools repo's — its source is `skills/<item_id>/` in the the tools repo repo; a symlink's source is its target. Plugin/marketplace clones are read-only — propose a diff, never write there.
+Resolve the CANONICAL source before reading: a path as given; a bare name against the user-level Claude Code `skills/` and `commands/`, then the current repo's `.claude/`. An installed copy carrying `.toolbox-package.json` is the tools repo's — its source is `skills/<item_id>/` in the the tools repo repo; a symlink's source is its target. So is the text between `<!-- toolbox:begin <id> … -->` markers in a CLAUDE.md / AGENTS.md and any `~/.claude/docs/toolbox/` doc: their source is `instructions/<id>/` in the the tools repo repo — distill there, never in place. Plugin/marketplace clones are read-only — propose a diff, never write there.
 
 ## Doctrine
 

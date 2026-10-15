@@ -25,9 +25,9 @@ Settle at minimum:
 
 ## 4. Draft under doctrine
 
-Apply the Doctrine and the frontmatter rule from `~/.claude/commands/distill.md` — the single home for both; never restate them here. Skill-specific additions: no model pinning.
+Apply the Doctrine and the frontmatter rule from `~/.claude/skills/distill/SKILL.md` (`## Doctrine`) — the single home for both; never restate them here. Skill-specific additions: no model pinning.
 
-Then run the reviewer loop from `~/.claude/commands/distill.md` (Flow step 2) on the draft — converge, keep the metrics for delivery. No user round-trips inside the loop.
+Then run the reviewer loop from `~/.claude/skills/distill/SKILL.md` (`## Flow` step 2) on the draft — converge, keep the metrics for delivery. No user round-trips inside the loop.
 
 ## 5. Confirm, scaffold, deliver
 

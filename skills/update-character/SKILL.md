@@ -12,7 +12,7 @@ State the rule as the CLASS of behavior wanted — goal + constraint in few word
 
 ## 2. Route — the CLAUDE.md gate first
 
-- Fresh session would make a wrong move in its first few actions without this line → CLAUDE.md at the pinned/derived scope.
+- Fresh session would make a wrong move in its first few actions without this line → CLAUDE.md at the pinned/derived scope. A rule for the whole team (how anyone works, not this person's taste) never goes between the `<!-- toolbox:begin … -->` markers on one Mac — that section is the tools repo-managed and an edit there freezes its upgrades: it is a PR to `henderson-tech/toolbox` editing `instructions/<id>/` (the tools repo `docs/instructions.md`). A personal rule goes in the same file outside the markers.
 - Behavior of one workflow or skill family → that skill, through the update-skill skill (canonical source, refine in place, propagate to siblings).
 - File-triggered rule → a `rules/` file (`~/.claude/rules/` or the repo's `.claude/rules/`) WITH `paths:` frontmatter. Verify in the current Claude Code docs how a rule without `paths:` loads before relying on it (expected: every session, like CLAUDE.md).
 - Must be harness-enforced (an "every time X" the model cannot guarantee) → a hook, via the update-config skill when available.

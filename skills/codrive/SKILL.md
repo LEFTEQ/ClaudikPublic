@@ -11,12 +11,12 @@ You drive; the human is the identity. The Onyx window is visible, carries the On
 2. Drive every non-identity step yourself; verify each transition with a snapshot before the next action.
 3. At an identity gate: stop driving, tell the user exactly what to do in the open window (which button, which card/reader), and wait for their go-ahead. If they'd rather you log in and onyx holds the credential, use onyx tooling — never handle secrets in plaintext or ask for them in chat.
    A verification code, confirmation link or password reset is **not** an identity gate — read it yourself from the shared test mailbox (below) and keep driving.
-4. After each gate, snapshot to confirm the new state before resuming. On rejection or error, report the exact on-screen text verbatim — don't retry blind.
+4. After each gate, confirm the new state before resuming. After a sign-in, use `browser_wait_for` on text the signed-in page shows, never a snapshot. If the login hangs, the filled form is still on screen, and a Playwright snapshot prints field values. "Filled secrets" in `~/.claude/docs/toolbox/browser.md` covers what is masked and the safe alternatives. On rejection or error, report the exact on-screen text verbatim — don't retry blind.
 5. Finish with the browser left open at the end state; report what completed, what's pending, and where the flow is parked.
 
 ## Email
 
-Every flow that needs an inbox uses one shared test mailbox, driven by the `posta` applet. Its address and app password live in the vault under the `AI Test Mailbox` group — posta reads both from the refs below, so no file ever names the mailbox. Never sign in to the webmail in the browser, and never ask the user to read a mail out to you.
+Every flow that needs an inbox uses one shared test mailbox, driven by the `posta` applet. Its address and app password live in the vault under the `AI Test Mailbox` group — find the item with onyx `secret_list` (query `AI test mailbox`) and pass its refs below, so no file ever names the mailbox. Never sign in to the webmail in the browser, and never ask the user to read a mail out to you.
 
 Mint a fresh address per run and register the app under **that** address — Gmail routes every `+tag` form to the same mailbox, so a run owns an inbox nobody else reads:
 
@@ -29,10 +29,10 @@ Run it through onyx so the app password is injected at the point of use, and pas
 
 ```
 onyx run_command
-  argv     ["~/.local/bin/posta", "wait", "--to", "<addr>",
+  argv     ["<absolute path of posta: command -v posta>", "wait", "--to", "<addr>",
             "--since", "10m", "--timeout", "120s", "--json", "--out", "/tmp/mail.json"]
-  env_refs POSTA_ADDRESS      onyx://AI%20Test%20Mailbox/Gmail%20AI%20test%20mailbox%20%E2%80%94%20app%20password/username
-           POSTA_APP_PASSWORD onyx://AI%20Test%20Mailbox/Gmail%20AI%20test%20mailbox%20%E2%80%94%20app%20password/app_password
+  env_refs POSTA_ADDRESS      <the mailbox item's username ref>
+           POSTA_APP_PASSWORD <the mailbox item's app_password ref>
 ```
 
 Then read `/tmp/mail.json`: `links[0]` is the call to action, and `posta links --match` narrows it further. `attach --save <dir>` writes files to disk, `send` posts mail from the mailbox, `purge --to <addr>` empties a run's address afterwards.

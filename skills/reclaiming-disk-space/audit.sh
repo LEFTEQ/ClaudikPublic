@@ -6,7 +6,8 @@
 # compose stacks, and named volumes left by deleted git worktrees) and the
 # exact commands you could run.
 #
-# THIS SCRIPT NEVER DELETES ANYTHING. It only reads + reports.
+# THIS SCRIPT NEVER DELETES OR CHANGES WHAT IT AUDITS. Besides its own temp files,
+# its one write is deep mode's full-disk ranking in ~/.local/state (GROWTH next run).
 # Run under bash (NOT zsh) — orphan classification relies on word-splitting
 # that zsh does not perform on unquoted vars (see SKILL.md "zsh trap").
 #
@@ -109,6 +110,10 @@ name_unresolved() {
 # ---------------------------------------------------------------------------
 bold "DISK"
 df -h /System/Volumes/Data 2>/dev/null | awk 'NR==1||/Data/{print}'
+# Free space at start: the closing DISK FILL line compares it with the end, since
+# a read-only run that loses free space has caught a live writer.
+free_kb() { df -k /System/Volumes/Data 2>/dev/null | awk 'NR == 2 { print $4 }'; }
+FREE0_KB="$(free_kb)"; T0=$(date +%s)
 hr
 
 # ---------------------------------------------------------------------------
@@ -241,6 +246,26 @@ if [ -d ~/.codex ]; then
     "$(find ~/.codex/sessions -type f -mtime +14 -print0 2>/dev/null | xargs -0 du -k 2>/dev/null | sum_g)" \
     "$(du -k ~/.codex/*.sqlite* 2>/dev/null | sum_g)"
 fi
+# A run that opens one worktree per attempt installs a full node_modules in each.
+# Every attempt is fresh, so the stale-checkout pass never sees it.
+echo "worktree fan-out (repos with 5+ linked worktrees; node_modules is logical — hardlinks count per worktree):"
+FAN="$(mktemp)"
+for w in "${ALL_WT[@]}"; do
+  common=""; gitdir=""
+  { read -r common; read -r gitdir; } < <(git -C "$w" rev-parse --path-format=absolute --git-common-dir --git-dir 2>/dev/null)
+  [ -n "$common" ] && [ "$common" != "$gitdir" ] || continue   # main clone, or not a repo
+  printf '%s\t%s\t%s\n' "$w" "${common%/.git}" "$(stat -f %B "$w")"
+done >"$FAN"
+cut -f1 "$FAN" | while IFS= read -r w; do printf '%s/node_modules\0' "$w"; done \
+  | xargs -0 -P 8 -n 1 du -sk 2>/dev/null \
+  | awk -F'\t' -v now="$NOW" 'NR == FNR { repo[$1] = $2; n[$2]++; if (now - $3 < 172800) r[$2]++; next }
+      { sub(/\/node_modules$/, "", $2); s[repo[$2]] += $1 }
+      END { for (k in n) if (n[k] >= 5) printf "%d\t%d\t%d\t%s\n", s[k], n[k], r[k], k }' "$FAN" - \
+  | sort -rn | head -8 | while IFS=$'\t' read -r kb n r repo; do
+      printf '      %6.1fG  %3d worktrees  %3d created <48h  %s\n' "$(echo "$kb / 1048576" | bc -l)" "$n" "$r" "${repo#"$HOME"/}"
+    done
+echo "      ^ remove a finished attempt with git -C <repo> worktree remove <path> once its run's owner confirms."
+rm -f "$FAN"
 hr
 
 # ---------------------------------------------------------------------------
@@ -344,18 +369,19 @@ fi
 # ---------------------------------------------------------------------------
 # Simulators tied to deleted worktrees (naming convention: "<app> wt <slug> ...")
 if have xcrun; then
-  bold "STALE SIMULATORS ('wt <slug>' of a deleted worktree; IDLE = not booted in ${STALE_DAYS}+ days)"
-  xcrun simctl list devices available 2>/dev/null \
-    | grep -oE '[A-Za-z]+ wt [a-z0-9][a-z0-9-]* (customer|worker)?' \
-    | while read -r line; do
-        slug="$(printf '%s' "$line" | sed -E 's/^[A-Za-z]+ wt ([a-z0-9-]+).*/\1/')"
-        if [ -z "${LIVE_SLUG[$slug]:-}" ]; then echo "    STALE  $line"; fi
+  bold "STALE SIMULATORS ('wt <slug>' of a deleted worktree; IDLE = not booted in ${STALE_DAYS}+ days; shut-down devices only)"
+  # Only Shutdown devices are offered: any other state is a session's live test.
+  xcrun simctl list devices available -j 2>/dev/null \
+    | jq -r '.devices[][] | select(.state == "Shutdown")
+        | (.name | capture(" wt (?<s>[a-z0-9][a-z0-9-]*)").s) as $slug | [$slug, .udid, .name] | @tsv' 2>/dev/null \
+    | while IFS=$'\t' read -r slug udid name; do
+        [ -z "${LIVE_SLUG[$slug]:-}" ] && echo "    STALE  $udid  $name"
       done | sort -u
   # Each device holds 3-4G of installed apps + data; sizes are logical (clones
   # share blocks), so only df after a delete is the truth.
   SIM_CUT="$(date -v-"${STALE_DAYS}"d +%Y-%m-%d)"
   xcrun simctl list devices -j 2>/dev/null \
-    | jq -r --arg cut "$SIM_CUT" '.devices[][] | select(.state != "Booted"
+    | jq -r --arg cut "$SIM_CUT" '.devices[][] | select(.state == "Shutdown"
         and ((.lastBootedAt // "0000") | .[0:10]) < $cut)
         | [.udid, ((.lastBootedAt // "never") | .[0:10]), .name] | @tsv' 2>/dev/null \
     | while IFS=$'\t' read -r udid lb name; do
@@ -429,6 +455,21 @@ if [ "$MODE" = "deep" ]; then
   awk 'NR <= 25 { s = $1; sub(/^[0-9]+\t/, ""); printf "%7.1fG  %s\n", s / 1048576, $0 }' "$RANKED"
   awk -v used="$(df -k /System/Volumes/Data | awk 'NR == 2 { print $3 }')" \
     '{ s += $1 } END { printf "    coverage: ranked %.0fG of %.0fG used on the Data volume; under ~90%% means a root is missing, over 100%% is clones/hardlinks counted twice\n", s / 1048576, used / 1048576 }' "$RANKED"
+  # A snapshot shows what is big; a diff against the previous ranking shows which
+  # trees grew between the two scans.
+  STATE="${XDG_STATE_HOME:-$HOME/.local/state}/reclaiming-disk-space"
+  if [ -s "$STATE/fulldisk.tsv" ]; then
+    echo "    growth since the previous deep run ($(stat -f %Sm -t '%Y-%m-%d %H:%M' "$STATE/fulldisk.tsv")), trees up 1G+:"
+    awk -F'\t' 'NR == FNR { prev[$2] = $1; next }
+      { d = $1 - prev[$2]; if (d >= 1048576) printf "%d\t%s%s\n", d, $2, ($2 in prev) ? "" : "  (new)" }' \
+      "$STATE/fulldisk.tsv" "$RANKED" \
+      | sort -rn | head -10 | awk -F'\t' '{ printf "    GROWTH  +%6.1fG  %s\n", $1 / 1048576, $2 }'
+  else
+    echo "    (first deep run on this Mac: GROWTH against this ranking starts with the next one)"
+  fi
+  # Publish atomically: a concurrent audit never reads a half-written baseline.
+  mkdir -p "$STATE" && SNAP="$(mktemp "$STATE/fulldisk.XXXXXX")" \
+    && cp "$RANKED" "$SNAP" && mv "$SNAP" "$STATE/fulldisk.tsv"
   rm -f "$RANKED"
   echo "    Anything big here with no row in the sections above is UNCLASSIFIED —"
   echo "    drill in by hand before deleting; assume user data until proven cache."
@@ -569,10 +610,9 @@ cat <<'CMDS'
   rm -rf ~/Library/Developer/Xcode/DerivedData/*
   xcrun simctl delete unavailable          # orphaned-runtime sims only
   # xcrun simctl runtime delete <UUID>     # UNUSED runtimes from the report (often 8GB each)
-  # xcrun simctl shutdown all && \
-  #   rm -rf ~/Library/Developer/CoreSimulator/Devices/*/data/var/db/diagnostics/*
-  #                                        # log spam only — keeps apps, logins, app data
-  # xcrun simctl shutdown all && xcrun simctl erase all   # wipe sim data, keep devices
+  # reclaim --only sim-logs                # log spam of shut-down sims only — keeps apps, logins, app data
+  # xcrun simctl erase <udid>              # wipe one shut-down sim's data, keep the device
+  # NEVER `simctl shutdown all` / `erase all`: a booted sim is another session's live test.
 
   # ---- Media caches: delete the AGED SLICE ONLY, never the whole tree ----
   # The recent slice is what keeps the app fast and re-costs an iCloud fetch.
@@ -608,10 +648,24 @@ cat <<'CMDS'
   #   docker compose -p <orphan-project> down        # or: docker rm -f <ids>
   #   docker volume rm <orphan-vol-1> <orphan-vol-2> ...
 
-  # Delete stale simulators by UDID (from `xcrun simctl list devices`):
+  # Delete STALE simulators by the UDID the report prints, re-reading each state first
+  # (Shutdown only — never shut a live device down to make it eligible):
   #   xcrun simctl delete <udid> <udid> ...
 CMDS
 echo
 echo "NOTE: OrbStack/Docker store data in a sparse disk image that auto-reclaims"
-echo "AFTER a prune — host free space lags by a minute. \`df\` also reads low while"
-echo "sims/Metro/builds are writing; re-check when idle."
+echo "AFTER a prune — host free space lags by a minute."
+hr
+
+FREE1_KB="$(free_kb)"
+# An unreadable df sample is unknown, never 0: bash arithmetic would turn it into a
+# fabricated FILLING verdict for the whole starting free space.
+if [[ "$FREE0_KB" =~ ^[0-9]+$ && "$FREE1_KB" =~ ^[0-9]+$ ]]; then
+  bold "DISK FILL — free $(( FREE0_KB / 1048576 ))G at start, $(( FREE1_KB / 1048576 ))G now, $(( ($(date +%s) - T0) / 60 )) min later"
+  if [ $(( FREE0_KB - FREE1_KB )) -ge 1048576 ]; then
+    echo "    FILLING  -$(( (FREE0_KB - FREE1_KB) / 1048576 ))G net while this read-only audit ran: something else is writing."
+    echo "    Report the decline over the elapsed time and look for the grower (deep GROWTH, worktree fan-out) before deleting more."
+  fi
+else
+  bold "DISK FILL — unknown: df could not read /System/Volumes/Data at the start or the end"
+fi

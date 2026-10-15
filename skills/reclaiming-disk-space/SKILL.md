@@ -26,9 +26,11 @@ volume's used space (`df -k /System/Volumes/Data`). Big and unclassified means u
 until proven otherwise — report it, never script it.**
 
 Agent sessions are the fastest-growing owner: run scratch in `/private/tmp`, raw perf and
-verification evidence parked untracked in `~/Exports`, per-worktree simulators, and the
-Claude/Codex transcripts themselves. No cache ladder owns any of it, so every audit sizes
-and ages it, and the user picks what goes.
+verification evidence parked untracked in `~/Exports`, per-worktree simulators, worktree
+fan-out (a run that opens one worktree per attempt installs a full `node_modules` in each),
+and the Claude/Codex transcripts themselves. No cache ladder owns any of it, so every audit
+sizes and ages it, and the user picks what goes. They also write while you clean: every
+audit measures the fill rate, not only the free space.
 
 **Third principle: a warm cache is not garbage.** Media caches (Messages previews,
 app-sandbox temp) are offered only as the slice older than `KEEP_DAYS` (default 60),
@@ -39,9 +41,9 @@ fast and costs an iCloud re-fetch to rebuild.
 
 | Mode | Invocation | What it does |
 |---|---|---|
-| **fast** | `reclaim` (the tools repo applet; `--until 100G`, `--tier N`, `--dry-run`, `--list`) | EMERGENCY. No scan, no prompt: a fixed ladder of regenerating caches deleted biggest-first, steps in a tier run concurrently, df printed after every step so wins land while slow steps (Docker prune) still run; `--until` stops as soon as enough is free. Tier 1 build/package caches (go-build, Docker build cache + images, bun tarballs + manifests but never `~/.bun/install/cache/links`, npm, DerivedData, gradle…) · 2 tool/app caches + crashed-tool temp (`tmp-instruments`, `tmp-browser-clones`, `tmp-bun`) · 3 aggressive-but-reversible (DeviceSupport, device-less sim runtimes, aged Messages/sandbox tmp, Trash). Never volumes, containers, recordings. Ends with by-hand notes. Spec: `toolbox` `docs/reclaim.md`. |
-| **default** | `bash audit.sh` | The audit + confirm-then-delete workflow below. Adds a generic `>1G` giant-file sweep of `~/Library` + the per-user temp root (finds by size, not by name), screen-recording staging, app-sandbox temp over 1G, the Messages preview cache, and the top log dirs. A **session-residue** report: shared-temp scratch (idle = hours since its newest file changed, `IN USE` when a process holds a file inside), `~/Exports` untracked bytes by run and file type, `~/Backups`, Claude/Codex history against `cleanupPeriodDays`. Also reports device-less iOS runtimes (often 8GB each), sims not booted in `STALE_DAYS`+, and per-sim diagnostics-log stores (~2GB/sim, deletable keeping apps + data). |
-| **deep** | `bash audit.sh deep` | Default audit PLUS a **full-disk pass** ranking every top-level tree of every root in the second principle (anything big with no row in the sections above is UNCLASSIFIED — drill in by hand); stale checkouts (every repo and worktree under `~/Work/Projects` per `git worktree list`; no git activity for 7+ days — reports node_modules/.next/.turbo/dist/Pods/vendor/target sizes) and wt-* worktree volume classification (PR merged + idle + clean → reclaimable; merged but recent or dirty → MERGED-ACTIVE; 7+ days idle unmerged → REVIEW-STALE; no worktree claims it → GONE unless a live or unresolved compose name may own it → REVIEW). Thresholds: `STALE_DAYS`, `KEEP_DAYS` env. May take minutes. |
+| **fast** | `reclaim` (the tools repo applet; `--until 100G`, `--tier N`, `--dry-run`, `--list`) | EMERGENCY. No scan, no prompt: a fixed ladder of regenerating caches deleted biggest-first, steps in a tier run concurrently, df printed after every step so wins land while slow steps (Docker prune) still run; `--until` stops as soon as enough is free. Tier 1 build/package caches (go-build, Docker build cache + images, bun tarballs + manifests but never `~/.bun/install/cache/links`, npm, DerivedData, gradle…) · 2 tool/app caches + crashed-tool temp (`tmp-instruments`, `tmp-browser-clones`, `tmp-bun`) · 3 aggressive-but-reversible (DeviceSupport, device-less sim runtimes, diagnostics logs of shut-down sims — a booted sim is never shut down, aged Messages/sandbox tmp, Trash). Never volumes, containers, recordings. Ends with by-hand notes. Spec: `toolbox` `docs/reclaim.md`. |
+| **default** | `bash audit.sh` | The audit + confirm-then-delete workflow below. Adds a generic `>1G` giant-file sweep of `~/Library` + the per-user temp root (finds by size, not by name), screen-recording staging, app-sandbox temp over 1G, the Messages preview cache, and the top log dirs. A **session-residue** report: shared-temp scratch (idle = hours since its newest file changed, `IN USE` when a process holds a file inside), `~/Exports` untracked bytes by run and file type, `~/Backups`, Claude/Codex history against `cleanupPeriodDays`, worktree fan-out per repo (count, created in 48 h, `node_modules`). Also reports device-less iOS runtimes (often 8GB each), sims of deleted worktrees (`STALE`) or not booted in `STALE_DAYS`+ (`IDLE`), and per-sim diagnostics-log stores (~2GB/sim, deletable keeping apps + data). Closes with DISK FILL: free at start vs end of the run. |
+| **deep** | `bash audit.sh deep` | Default audit PLUS a **full-disk pass** ranking every top-level tree of every root in the second principle (anything big with no row in the sections above is UNCLASSIFIED — drill in by hand), each tree's `GROWTH` since the previous deep run (its ranking persists in `~/.local/state/reclaiming-disk-space/`); stale checkouts (every repo and worktree under `~/Work/Projects` per `git worktree list`; no git activity for 7+ days — reports node_modules/.next/.turbo/dist/Pods/vendor/target sizes) and wt-* worktree volume classification (PR merged + idle + clean → reclaimable; merged but recent or dirty → MERGED-ACTIVE; 7+ days idle unmerged → REVIEW-STALE; no worktree claims it → GONE unless a live or unresolved compose name may own it → REVIEW). Thresholds: `STALE_DAYS`, `KEEP_DAYS` env. May take minutes. |
 
 When invoked with an argument (`/reclaiming-disk-space fast|deep`), run that mode.
 In fast mode, run `reclaim` (`~/.local/bin/reclaim` links the Homebrew `toolbox` cask: a ladder step missing from `reclaim --list` ships with the next the tools repo release, `brew upgrade --cask toolbox`) and report its AFTER line plus the NOT DELETED block — that is the whole flow, streamed per "Stream every mode" below. Fast mode sizes nothing outside its ladder: "what else / what is big" is deep. Its `--dry-run` doubles as a sizing pass when the disk is not yet critical.
@@ -52,12 +54,9 @@ branches never show merged in local `git branch --merged`.
 
 ## Stream every mode — a silent wait is a bug in how you launched it
 
-**Every mode here runs for minutes and prints progressively; none of them should be
-launched in a way that hides that.** `reclaim` emits one line per finished step
-(`[tier] title  size  seconds  free <df>`), `audit.sh` emits one section at a time —
-but a foreground Bash call shows nothing until the process exits, and piping through
-`tail`/`head`/`$(…)` buffers it even then. The user sits watching a blank terminal
-while a Docker prune or a `find ~/Library` sweep grinds. Never do that to them.
+**Every mode runs for minutes and prints progressively** — `reclaim` one line per step
+(`[tier] title  size  seconds  free <df>`), `audit.sh` one section at a time. A foreground
+Bash call shows nothing until exit, and `tail`/`head`/`$(…)` buffer it even then.
 
 Launch detached into a private log, arm a filter, relay lines as they land. Mint the
 log first (`mktemp -t reclaim` prints a unique path only you can write: parallel
@@ -77,10 +76,13 @@ summarized:
 | Mode | Monitor command |
 |---|---|
 | fast | `tail -f <log> \| grep -E --line-buffered '^\[\|AFTER\|FAILED\|target \|NOT DELETED'` |
-| default / deep | `tail -f <log> \| grep -E --line-buffered 'DISK\|OFFENDERS\|CACHES\|GIANT\|STAGING\|DOCKER\|SIM \|RESIDUE\|DEEP —\|SUGGESTED\|ORPHAN\|MOVED\|REVIEW\|DB!'` |
+| default / deep | `tail -f <log> \| grep -E --line-buffered '\[1m\|ORPHAN\|MOVED\|REVIEW\|DB!\|GONE\|MERGED\|STALE\|IDLE\|UNUSED\|GROWTH\|FILLING'` |
 
-The verdict tokens belong in the audit filter: the section headers prove it is alive,
-the `ORPHAN`/`MOVED`/`REVIEW`/`DB!` lines are the payload you are waiting for.
+`\[1m` matches every section header (`audit.sh` prints each in bold), so a new section
+can never fall outside the filter; the verdict tokens are the payload you are waiting for.
+Events are a progress feed, not the report — a long batch arrives truncated. Build the
+summary from the finished log read end to end (`sed 's/\x1b\[[0-9;]*m//g' <log>`), never
+from events or a slice starting at one header: a slice skips the sections between.
 
 `--line-buffered` on every `grep` stage is load-bearing; `head` cannot flush at all, so
 never put one in the pipeline. Relay a one-line update per tier (fast) or per section
@@ -99,7 +101,8 @@ foreground.
    ```
    It prints: disk free, top home offenders, largest caches, `docker system df`,
    **orphan compose stacks** (source dir gone), **orphan/review/DB volumes** with
-   sizes, **stale simulators**, and a ready-to-run command block.
+   sizes, **stale simulators**, worktree fan-out, a ready-to-run command block, and
+   the DISK FILL line.
 
 2. **Read the verdicts.** `ORPHAN` = source dir gone **and** no live compose file
    resolves to that project name → safe. `MOVED` = source dir gone but the name is
@@ -112,9 +115,13 @@ foreground.
    removed. If `rm` is blocked by the permission sandbox, hand the exact commands to
    the user to run (`! <cmd>` in-session, or their terminal).
 
-4. **Re-check when idle.** `df` reads low while sims/Metro/builds write; OrbStack &
-   Docker Desktop keep data in a sparse image that **auto-reclaims a minute after a
-   prune** — host free space lags the logical reclaim. Don't conclude "it didn't work."
+4. **Measure the fill rate before trusting a delta.** With agent sessions running the
+   disk is never idle: sims, Metro, builds and worktree fan-out write while you delete,
+   and OrbStack & Docker Desktop keep data in a sparse image that **auto-reclaims a
+   minute after a prune**. A `FILLING` verdict on the DISK FILL line means free space
+   fell while the read-only audit ran. Report that decline over the elapsed time and
+   look for the grower (deep `GROWTH`, worktree fan-out) before deleting more —
+   reclaiming under it only buys hours.
 
 5. **End with a summary table.** Every reclamation session (any mode) closes with:
    the headline `X Gi → Y Gi free = ~Z Gi reclaimed`, then a table grouped by type,
@@ -123,9 +130,10 @@ foreground.
    | Type | What / where | Freed |
    |---|---|---|
 
-   Rules: record `df` at the START and after each group — the df deltas are the
-   ground truth for "Freed". Where a group's physical reclaim differs from its
-   logical size, show both (`~15 G physical (~50 G logical)`) and say why: any tree
+   Rules: record `df` at the START, and read it immediately before and after each
+   delete in the same command — those deltas are the ground truth for "Freed". Under a
+   `FILLING` disk even they are net of other writers: say so, and give the logical size.
+   Where a group's physical reclaim differs from its logical size, show both (`~15 G physical (~50 G logical)`) and say why: any tree
    built by clonefile or hardlinks — pnpm/bun `node_modules` (into the global store;
    `pnpm store prune` collects the rest), simulator devices (clones of the runtime
    image), browser `*.code_sign_clone` copies (clones of the installed app) — frees
@@ -147,19 +155,20 @@ foreground.
 | App logs | `rm -rf ~/Library/Logs/{JetBrains,CreativeCloud}/*` && `rm -f ~/Library/Logs/*.log.old.*` | none |
 | Homebrew | `brew cleanup -s` | none |
 | Xcode build | `rm -rf ~/Library/Developer/Xcode/DerivedData/*` | none (rebuilds) |
-| Sim data | `xcrun simctl delete unavailable` / `erase all` | low, frees ~0 — APFS clones of the runtime |
+| Sim data | `xcrun simctl delete unavailable` / `erase <udid>` | low, frees ~0 — APFS clones of the runtime |
 | Unused sim runtime | `xcrun simctl runtime delete <UUID>` (0-device runtimes from report; the report never offers Xcode's own SDK runtime) | none (re-downloads via Xcode); never a runtime its devices still name — they turn unavailable |
-| Sim log spam | shutdown all, then `rm -rf .../Devices/*/data/var/db/diagnostics/*` | none (logs only; apps + data survive) |
+| Sim log spam | `reclaim --only sim-logs` (shut-down sims only) | none (logs only; apps + data survive; a booted sim keeps its logs) |
 | Crashed-tool temp (Instruments `*.ktrace` > 12 h, orphaned browser `*.code_sign_clone`, bun install extracts > 24 h) | `reclaim --only tmp-instruments,tmp-browser-clones,tmp-bun` | none: a clone a running browser may own stays; clones free far less than listed |
 | Session scratch in `/private/tmp` (perf/e2e runs: traces, APKs, frame dumps) | `rm -rf /private/tmp/<name>` for the names the user picks, re-checked at delete time: newest file 24 h+ old (`find -type f` + `stat -f %m`, never the dir mtime) and no process holding a file inside (one `lsof -Fn` pass) | low: scratch, but a paused campaign may still want it |
 | Raw evidence in `~/Exports` (untracked `.pftrace`, frames, recordings) · `~/Backups` | by hand, after the user confirms each run was read or each backup superseded | user data: untracked = the only copy |
 | Claude / Codex transcripts | lower `cleanupPeriodDays` in `~/.claude/settings.json`; never `rm` the jsonl by hand | none |
 | Stale project artifacts (deep) | `rm -rf <proj>/node_modules <proj>/.next …` by path from report | low (reinstall on next use) |
+| Worktree fan-out (finished attempts) | `git -C <repo> worktree remove <path>` per attempt its run's owner confirms finished | user data: an unmerged attempt lives only there; one created in the last 48 h may belong to a live run |
 | Stale bun `.bun` entries in a live checkout | `reclaim bun-prune <checkout>` (dry run: unreachable dirs + `.old_modules-*`, sizes), then `--apply` | none: deletes only what nothing resolves to; keeps entries an `ios/Podfile.lock` names, anything under 24 h, and `links/` |
 | Merged wt-* stack (deep) | `docker compose -p <proj> down` then `docker volume rm <vols>` | safe IF MERGED verdict |
 | Docker cache+images | `docker builder prune -af` && `docker image prune -af` | none (re-pull/rebuild) |
 | Orphan stack | `docker compose -p <proj> down` then `docker volume rm <vols>` | safe IF `ORPHAN` (never `MOVED`) |
-| Stale sim | `xcrun simctl delete <udid>` | safe IF deleted worktree; an `IDLE` sim (not booted in `STALE_DAYS`+) only once the user confirms it — QA sets are kept on purpose |
+| Stale sim | `xcrun simctl delete <udid>` (the report prints shut-down devices only; re-read the state first) | safe IF deleted worktree; an `IDLE` sim (not booted in `STALE_DAYS`+) only once the user confirms it — QA sets are kept on purpose |
 
 ## How orphans are classified (and why it's safe)
 
@@ -193,13 +202,15 @@ means "confirm by hand", never "auto-delete" (trivial 0B ones are suppressed).
 | Hand-rolling the orphan classifier in **zsh** | Unquoted `$active` does **not** word-split in zsh → every active worktree mislabeled ORPHAN → would delete live DBs. Run the script under **bash**; never trust a zsh loop here. |
 | `docker volume rm` fails "volume is in use" | A stopped container still holds it. `docker compose -p <proj> down` (or `docker rm -f <ids>`) first, then remove volumes. |
 | Expecting `image prune -a` to free the full "reclaimable" | It only removes images **no container** (running *or stopped*) references. Prune stopped containers first to free more. |
-| Trusting `df` right after deleting | Active writers + sparse-image lag. Re-measure idle; check OrbStack footprint at `~/Library/Group Containers/*orbstack*`. |
+| Trusting `df` right after deleting | Sparse-image lag and other sessions' writes: under a `FILLING` disk the net stays flat even when the delete worked. Read df around the delete itself; check OrbStack footprint at `~/Library/Group Containers/*orbstack*`. |
 | Forcing `rm` when the sandbox denies it | Don't escalate. Print the exact command; the user runs it. |
 | Deleting a `DB!` volume to save a few MB | Irreversible data loss for tiny gain. Skip unless certain. |
 
 ## Red Flags — STOP
 
 - About to type `prune --volumes` or `prune -a --volumes` → **don't**; delete by name.
+- About to run `xcrun simctl shutdown all` or `erase all` → **don't**: a booted sim is
+  another session's live test. Act per UDID, on shut-down devices only.
 - About to `rm -rf ~/.bun/install/cache` (or anything in `links/`) → **don't**: with
   `globalStore` every checkout's `node_modules/.bun` symlinks into `links/`, so one
   wipe dangles them all and the repair is a `bun install` per checkout. Use

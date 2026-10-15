@@ -12,13 +12,13 @@ Index the session: the user's point beneath the phrasing, and the proven method 
 
 ## 2. Draft under doctrine
 
-Apply the Doctrine and the frontmatter rule from `~/.claude/commands/distill.md` — the single home for both; never restate them here. Command-specific additions: directive voice; no session-specific nouns unless they ARE the point.
+Apply the Doctrine and the frontmatter rule from `~/.claude/skills/distill/SKILL.md` (`## Doctrine`) — the single home for both; never restate them here. Command-specific additions: directive voice; no session-specific nouns unless they ARE the point.
 
 Wire in `$ARGUMENTS` if the command takes input, and say what empty means. A large engine is a skill (`/to-skill`), never a command that Reads one.
 
 ## 3. Reviewer pass
 
-Run the reviewer loop from `~/.claude/commands/distill.md` (Flow step 2) on the draft — converge, keep the metrics for delivery. No user round-trips inside the loop.
+Run the reviewer loop from `~/.claude/skills/distill/SKILL.md` (`## Flow` step 2) on the draft — converge, keep the metrics for delivery. No user round-trips inside the loop.
 
 ## 4. Confirm, write, deliver
 

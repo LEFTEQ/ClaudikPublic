@@ -46,6 +46,31 @@ The per-target lanes, tiers and deep passes: `references/targets.md`.
 6. **Evidence.** `polish-kit sheet` (contact and edge sheets per screen), `polish-kit report` (the pass table with a delta against the previous pass). One vitrinka board per pass via `/vitrinka:publish`: the report, the sheets, screenshots of the fixed states.
 7. **Hand off.** `blip down --all`, `polish-kit lanes set <lane> --reset` for every lane touched, app left running on the device, then `/prm` on the existing PR with the board URL and the report in its body.
 
+## Specialist lanes
+
+Linked evidence a human reviews, never a gate: polish-kit verdicts, the
+`ui-loop` router (`state`'s `next`) and every schema stay as they are.
+
+- **Smoothness** (a finding or a touched `app` screen about jank, scroll, a
+  loop at rest or input latency): a scoped perf lane through the
+  `expo-device-perf` skill: perflab `probe rest|drag|fling` on the touched
+  screens, or the project's scenario A/B against the base (`--alternate
+  --repeat 2`). Record it as a matrix cell (`polish-kit run add-cell --kind
+  matrix --lane <lane> --flow "<screen>" --tier perf`) closed with `polish-kit
+  cell <id> pass --note "<runDir>: <compare verdict>"`, or on a regression
+  `polish-kit cell <id> fail --shot <png> --note "<runDir>: <compare
+  verdict>"` (a fail needs its shot: `perflab device screencap <device>
+  --lease <t> --out <png>` of the screen). A ui-loop fix for
+  smoothness names the run dir in its checkpoint `note`. perflab's verdict
+  stays perflab's; the cell is your reviewed reading of it.
+- **Model-backed behaviour** (a journey, render, stream or error state that
+  depends on a model's answer): its own campaign through the `eval-campaign`
+  skill, with its own plan, ledger and verdict. Polish drives the UI around
+  it (loading, streaming, error, retry under blip faults) and cites the
+  campaign's `status` in the cell's `--note` (a failing cell also takes its
+  `--shot` of the failing state); a polish pass never grades the
+  model and never stands in for the eval's verdict.
+
 ## blip
 
 ```

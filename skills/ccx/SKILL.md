@@ -1,15 +1,21 @@
 ---
 name: ccx
-description: "Use when manual or verification work should go to the Codex sidekick, the native `codex` / `codex-high` subagent, instead of this session: user test / usertest, verify it in the UI, browser or simulator, computer use, explore the app, map routes or journeys, write, rework or run e2e or other tests. Also use when the user says 'ccx', 'codex high', 'codex xhigh' or 'sidekick', or asks to hand work to Codex."
+description: "Use when manual or verification work should go to the Codex sidekick, the native `codex` / `codex-high` subagent, instead of this session: user test / usertest, verify it in the UI, browser or simulator, computer use, explore the app, map routes or journeys, write, rework or run e2e or other tests, sweep one mechanical transformation across many source files (i18n `t()` extraction, renames, codemods). Also use when the user says 'ccx', 'codex high', 'codex xhigh' or 'sidekick', or asks to hand work to Codex."
 codex-ignore: true
 ---
 
 # ccx: hand the manual work to the `codex` subagent
 
-This session orchestrates and writes app code. Driving, looking, mapping and test
-writing go to the native `codex` subagent (Codex on gpt-6.1-sol), which carries the
-sidekick contract: test files only, no git, one result Claude reads. Never dispatch
-through the Codex CLI (`switcheroo codex run`, `cx`, `codex exec`).
+This session orchestrates and authors every app change that takes judgment. Driving,
+looking, mapping, test writing and mechanical source sweeps go to the native `codex`
+subagent (Codex on gpt-6.1-sol), which carries the sidekick contract: test files only
+unless the brief is a sweep, no git, one result Claude reads. Never dispatch through
+the Codex CLI (`switcheroo codex run`, `cx`, `codex exec`).
+
+**The user's explicit ask outranks the route.** When the user asks for Codex to do a
+piece of work, it goes to Codex whatever this skill would route it to (UI, logic,
+fixes included): quote their words in the brief, which lifts any contract rule the
+ask conflicts with. Only their own words count, never Claude's inference.
 
 **If you are the sidekick (a `codex` subagent), this skill is not for you.** Do the
 brief yourself.
@@ -31,7 +37,11 @@ they are ordinary subagents, with a row in the subagent view, background runs an
   the shell's cwd.
 - Inside a Workflow: `agentType: 'codex'`. With `isolation: 'worktree'` it runs in a
   fresh `.claude/worktrees/` copy of the session repo branched from local HEAD, never
-  a worktree you prepared; name a prepared one in the brief instead.
+  a worktree you prepared; name a prepared one in the brief instead. A review or
+  verification lane's schema requires a non-empty `checked` list (each file or item it
+  examined, with its verdict); the script treats a result with no findings and no
+  checked entries as a failed lane, logs it and re-runs that lane as a Claude agent.
+  The sidekick can answer an empty structured result without having reviewed anything.
 - `usertest`: the agent runs the vitrinka `usertest` skill itself. `e2e-write` and an
   `e2e-run` that drives journeys: don't hand the agent the lead. Run the `e2e` skill
   here: it leads natively and dispatches its discovery agents and lane writers as
@@ -49,7 +59,9 @@ they are ordinary subagents, with a row in the subagent view, background runs an
 - Don't edit app source while a `verify`, `usertest` or `e2e-run` lane is driving
   that worktree, because its verdicts become nondeterministic. Edit between turns,
   then continue it. `e2e-write` and `rework` are static (no app, no browser), so
-  they may run alongside your edits: the tests follow the code.
+  they may run alongside your edits: the tests follow the code. A `sweep` owns the
+  files it scopes until it ends: Claude edits elsewhere, and no live lane drives that
+  worktree meanwhile.
 - Never put secret values in a brief. Name the seed account or the onyx ref.
 
 ## Route
@@ -63,13 +75,16 @@ they are ordinary subagents, with a row in the subagent view, background runs an
 | write e2e journeys and specs | the `e2e` skill, led here; its discovery agents and writers are `codex` agents |
 | write unit or integration tests, rework broken specs | sidekick, `e2e-write` / `rework` |
 | run e2e or other suites | sidekick, `e2e-run` |
-| app source edits, fixes for findings, design, a one-grep code lookup mid-task | Claude, here (never routed) |
-| judging pixels: a vitrinka board or journey review, visual verify of board takes or shots, anything that must read `get_card_image` or a PNG | Claude, here or a Claude agent (never routed) |
+| mechanical source sweep: one spelled-out transformation over many files (i18n `t()` extraction, renames, codemods, import or API migrations) plus the type and test fixes it forces | sidekick, `sweep` |
+| UI and design work, new logic or behaviour, fixes for findings, a one-grep code lookup mid-task | Claude, here (routed only on the user's explicit ask) |
+| judging pixels: a vitrinka board or journey review, visual verify of board takes or shots, anything that must read `get_card_image` or a PNG | sidekick when `vitrinka config reviewer` is `codex`; Claude here otherwise |
 
-Codex receives tool-result images as `[image omitted]`, so a pixel-judging lane
-there can only stop blocked. A vitrinka review can also run as
-`/vitrinka:review … eve`: Eve judges server-side and the local pass re-verifies
-against code, which needs no images.
+Codex lanes receive tool-result images through claude-switcheroo's bridge; an
+older proxyd still answers `[image omitted]` (check `switcheroo proxyd status`).
+A vitrinka review proves sight per run: sheet 1 of its review run prints a code
+the lane must echo before sheet 2 or any filing, so a blind lane stops after one
+image instead of reporting "no findings". `/vitrinka:review … eve` stays the
+server-side alternative: Eve judges and the local pass re-verifies against code.
 
 Effort is `medium`. Use `codex-high` only when the user says "codex high" or "codex
 xhigh".
@@ -84,9 +99,18 @@ xhigh".
 | ends `Codex account <name> could not take this turn (429)` | That account is rate-limited for now, not a failed brief: the turn never ran. Continue or respawn the lane natively once the limit clears, with fewer lanes running. A lone lane can hit it too. Never switch to the CLI or the fallback for it. |
 | ends `No Codex account …` | Fall back. |
 
+A lane whose final message lacks the `STATUS:` line, or is empty or off-brief, may
+have been stopped by claude-guards after three identical schema-invalid calls: the
+harness reports that stop as a normal completion. Check before acting on it:
+`claude-guards storms --session "$CLAUDE_CODE_SESSION_ID" --since <spawn time> --check`.
+Exit 2 is a `failed` lane; its receipt names the tool and the missing parameters. An
+empty input means the bridge dropped the arguments: `switcheroo proxyd status` before
+continuing it, never a blind retry.
+
 **Fallback** (no `codex` agent listed, or no Codex account left). Use one
 `general-purpose` Agent with `model: "opus"` per lane. Give it the same brief plus
-the contract essentials: test files only, no git, the same result shape. Keep the
+the contract essentials: test files only (or the sweep's scope), no git, the same
+result shape. Keep the
 agent persistent through SendMessage for the lane and shut it down when the lane
 ends. The `e2e` skill has its own Opus fallback, where Claude leads Phases 1-2 and
 spawns one named Opus writer per lane.
@@ -144,6 +168,14 @@ roles) · **Done when** · the mode lines below.
 - **e2e-run**: "Run <specs | --grep @e2e-<slug> | the suite> with the repo's runner, where the repo runs tests (Devbox when it has `devbox.yaml`), workers capped.
   Classify each failure. A spec bug: fix the spec and rerun it once. An app bug:
   record a finding with evidence and don't fix it. Report the counts in `tests`."
+- **sweep**: "Transformation: <before → after, with one worked example from this
+  repo>. Scope: <globs>, excluding <…>. Also update <the compiler/type errors and
+  unit tests the transformation forces>. Change nothing else: no UI, copy, behaviour
+  or logic decisions; a site the pattern doesn't settle stays untouched and becomes a
+  finding with its file and line. Gate: <typecheck / lint / unit-test command> over
+  your scope. Report the files changed and the gate result." A large sweep splits
+  into lanes over disjoint globs in one worktree; Claude runs the whole gate once
+  they all end.
 
 **When suites run.** While code is still changing, test lanes stay static. Do one
 full `e2e-run` at the end of the work, or right after a risky change.
@@ -152,10 +184,14 @@ full `e2e-run` at the end of the work, or right after a risky change.
 
 The sidekick never commits.
 
-1. **Check the diff.** The files and tests it reports written must be test files
-   only, and `git status --short` in the worktree must show no app-source change you
-   didn't make. Anything else breaches the contract: review it as a stranger's
-   change, keep or revert that path, and tell the user.
-2. **Commit the test files, path-scoped.** Follow the `push-all` §2 conventions:
-   `git -C <wt> add -- <files>`, then commit, e.g. `test(e2e): <lane>`.
+1. **Check the diff.** The files and tests it reports written must be test files,
+   or inside the sweep's scope (or the user's explicit ask), and `git status --short`
+   in the worktree must show no other app-source change you didn't make. Anything
+   else breaches the contract: review it as a stranger's change, keep or revert that
+   path, and tell the user. Check a sweep like your own codemod: `git diff --stat`
+   stays inside the scope, every hunk follows the pattern (grep the diff for any that
+   doesn't), and the gate is green.
+2. **Commit the lane's files, path-scoped.** Follow the `push-all` §2 conventions:
+   `git -C <wt> add -- <files>`, then commit, e.g. `test(e2e): <lane>` or
+   `refactor(<scope>): <transformation>`.
 3. **Report.** Fix or file what the findings say, then report the result.

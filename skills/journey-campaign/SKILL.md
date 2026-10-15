@@ -45,6 +45,9 @@ When the project uses the tools repo `journeys`, read its current `--help` and t
 project adapter contract. `start` is preflight, `probe` is a read, `verdict` is a
 separate evidenced judgment. The engine's acceptance of a record does not prove
 that the UI was observed. Use fresh output paths for immutable receipts.
+A readiness gate the repo declares (`gate run <name>`, the tools repo `docs/gate.md`)
+runs before `start`: a stale or failed gate is a setup blocker to fix first,
+never a journey outcome.
 
 ## Execute and verify one consequential transition
 

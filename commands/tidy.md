@@ -1,20 +1,21 @@
 ---
 disable-model-invocation: true
 name: tidy
-description: "Resolve leftovers: audit branches, worktrees and compose stacks, then merge, delete or tear down each."
+description: "Resolve leftovers: audit branches, worktrees, compose stacks and Devbox workspaces, then merge, delete or tear down each."
 argument-hint: "[slug|all] [--dry-run]"
 ---
 
 # /tidy — resolve everything left hanging
 
-One pass: audit every branch, worktree, and compose stack, then resolve what the
-audit proved — merge the mergeable, delete the merged (local branch, remote branch,
-worktree, stacks), tear down orphan compose projects. The audit is the evidence;
+One pass: audit every branch, worktree, compose stack and Devbox workspace, then
+resolve what the audit proved — merge the mergeable, delete the merged (local branch,
+remote branch, worktree, stacks), tear down orphan compose projects, let `devbox gc`
+retire the workspaces this run emptied. The audit is the evidence;
 nothing is deleted without it.
 
 **Never touches:** the current branch, the default branch, anything unmerged (unless
 the user picks its merge action), anything dirty, anything with an open PR, anything
-on the keep-list.
+on the keep-list, any checkout a staying Devbox workspace syncs.
 
 ## 1. Audit — always, never skipped
 
@@ -28,6 +29,9 @@ on the keep-list.
    git branch -r --no-color | sed 's/^[[:space:]]*//' | grep -v '^origin/HEAD'
    git worktree list --porcelain
    docker compose ls -a --format json      # running AND stopped
+   devbox ls --json                        # .data.workspaces[]: name, box, apps[].sync
+   mutagen sync list --template '{{json .}}' |   # running AND paused
+     jq -r '.[] | [.alpha.path, .beta.path, (.paused // false)] | @tsv'
    ```
 5. Keep-list: `.claude/tidy-keep` (one branch/worktree path per line, `#` comments)
    marks parked work — excluded from candidacy and probes; report as one line
@@ -73,27 +77,42 @@ on the keep-list.
   `sub()` defaults to `$0`, and `du`'s record is `<size>\t<path>`, so an unanchored
   `sub` appends the `B` to the PATH and silently leaves the size bare. `0B` already
   carries its unit and is left alone.) · holders (`lsof +D <path>` — listed in the
-  report; audit only lists, never kills).
+  report; audit only lists, never kills). A `mutagen` holder is a live Devbox
+  workspace's sync, never a dev server.
+- **Devbox cross-check** — lsof misses a PAUSED sync. For each candidate, every
+  inventory sync row whose `alpha.path` equals the worktree path names a workspace
+  (`beta.path` = `ws/<workspace>/<role>`, session `ws-<workspace>-<role>`). Removable
+  only if each such workspace retires in this run: ALL its checkouts (`apps[].sync`)
+  are removal candidates. Else `BLOCKED-workspace <name>` (2026-10-15: merged, clean,
+  holder-free `AcmeBack/.worktrees/vt1339-e2e-stack` was the BE side of
+  `acme-feat-ui-polish-ios26`, an open PR's stack with its sync paused).
 - **Sizes are a snapshot and go stale fastest on live worktrees** — a checkout still
   being built or installed into grows between the audit and the report. Never re-use a
   size across passes; measure at report time, and never let a size influence
   candidacy (only the merge/dirty/PR guards decide that).
 - Classes by priority: **REMOVABLE** (branch DELETABLE + clean) · **BLOCKED-dirty**
-  (DELETABLE + uncommitted, show counts) · **MERGEABLE** (unmerged, clean, probe
-  clean → `merge → remove`) · **CONFLICTS ×N** · **DIRTY** (unmerged + uncommitted)
+  (DELETABLE + uncommitted, show counts) · **BLOCKED-workspace <name>** (synced by a
+  workspace that stays — reported, never offered) · **MERGEABLE** (unmerged, clean,
+  probe clean → `merge → remove`) · **CONFLICTS ×N** · **DIRTY** (unmerged + uncommitted)
   · **BLOCKED-open-PR** (→ `/prm`) · `⚠ branch gone`.
 - **STRAY DIR** — under `.worktrees/` but unknown to git
   (`comm -23 <(ls -1 .worktrees | sort) <(git worktree list --porcelain | awk '/^worktree /{print $2}' | xargs -n1 basename | sort)`);
   candidate only after `find <dir> -type f | head` + `du -sh` (rendered `…B` as above)
   show build artifacts alone.
 
-### Classify each compose stack
+### Classify each compose stack and Devbox workspace
 
 From `docker compose ls -a`, keep this repo's projects: `wt-<slug>` / `wk-<slug>`
 (+ `-e2e` twins) and the repo's own name. Cross-reference worktree existence:
 **LIVE** (worktree exists → keep) · **ORPHAN running** (→ offer `down`) · **ORPHAN
 stopped** (→ offer full removal; `down -v` only under §3's carve-out; count volumes
 + size, same `…B` rendering).
+
+Devbox workspaces with an `apps[].sync` under this repo: **LIVE** (a checkout
+stays → keep) · **RETIRING** (every checkout, in every repo, is a removal candidate
+this run — a FE+BE workspace retires only when both sides are, i.e. under `all`) →
+`devbox gc` after §3's deletions, since gc reaps only branch merged/gone AND Mac
+worktree gone.
 
 ### Print the report
 
@@ -117,15 +136,23 @@ WORKTREES
 ┌ .worktrees/wip       feat/wip · 2.1GB
 │  DIRTY 3 files · +47/−12 · CONFLICTS ×2
 │  holder: node (vite) pid 4242
+┌ .worktrees/be-x      feat/be-x · 310MB
+│  merged · clean · BLOCKED-workspace
+│  acme-feat-ui-polish (sync paused)
 
 COMPOSE STACKS
 ┌ wt-foo    orphan · running → down
 ┌ wt-wip    live · running · keep
 
+DEVBOX WORKSPACES
+┌ acme-feat-foo        retiring → gc
+┌ acme-feat-ui-polish  live · keep
+
 SUMMARY
   deletable: 3 local · 2 remote
   removable worktrees: 1 · mergeable: 1
-  orphan stacks: 2 · blocked: 1 · kept: 3 listed
+  orphan stacks: 2 · retiring workspaces: 1
+  blocked: 2 · kept: 3 listed
   reclaimable: ~3.6GB
 fetch --prune: pruned 0 · gh OK
 ```
@@ -134,8 +161,9 @@ fetch --prune: pruned 0 · gh OK
 
 AskUserQuestion, `multiSelect`, one option per resolvable item carrying its action
 and everything that goes with it (`remove: feat/foo — local + remote + worktree +
-wt-foo stack` · `merge → remove: feat/bar` · `down: wt-old stack (orphan, 2 vols)` ·
-`keep: feat/baz → tidy-keep`). Never one prompt per item.
+wt-foo stack + workspace acme-feat-foo` · `merge → remove: feat/bar` ·
+`down: wt-old stack (orphan, 2 vols)` · `keep: feat/baz → tidy-keep`). Never one
+prompt per item.
 
 `--dry-run` → print the report, stop. Nothing resolvable → `(nothing to tidy)`, stop.
 
@@ -155,7 +183,10 @@ the batch and is reported, never acted on with older evidence.
    matching `next dev|expo|metro|nest|vite|webpack|tsx watch|bun run .*dev|node .*(dev|serve)|playwright.*test`.
    **NEVER kill** `claude`, `tmux`, any `*mcp*`, shells, or editors — live sessions,
    often someone else's. Non-dev holders remaining → skip that item, report
-   `pid + command`, move on. Blocked is the safe outcome.
+   `pid + command`, move on. Blocked is the safe outcome. A `mutagen` holder is a
+   live Devbox workspace: NEVER `devbox down`/`park`/stop it to free a path — the
+   item is blocked, report the workspace (2026-10-15: a tidy `devbox down` took out
+   `acme-work-eve-tenant-testing`, another session's live FE+BE+eve stack).
 2. **Project-native teardown wins.** Repo declares one (`AFTER_MERGE_CMD` in
    `.claude/.claude.git.config` — see `~/.claude/skills/prm/references/config.md` —
    or a `worktree:cleanup` script) → run its dry-run then the real thing.
@@ -188,8 +219,16 @@ the batch and is reported, never acted on with older evidence.
    Report each deletion. `git branch -r` lists `devbox/*` alongside `origin/*` —
    strip the remote prefix before classifying; never feed `devbox/feat/foo` to a
    `push --delete origin`.
-7. **Keep actions:** append each selected `keep` to `.claude/tidy-keep`.
-8. **Re-check the path** — a dev server that outlived the teardown recreates it as
+7. **Devbox workspaces** — after the branch and worktree deletions,
+   `devbox gc --dry-run --json`: its `dead` set
+   (`.data.workspaces[] | select(.verdict=="dead") | .name`) must hold only this
+   run's RETIRING workspaces → `devbox gc --json`. Anything else dead → no gc;
+   `devbox reap <ws>` each of this run's instead. `--box` only where the CLI's
+   `next`/fix prints it (Devbox routes boxes itself). `RUN_WORKSPACE_LOCKED` or an
+   admission-lock `WS_REAP_FAILED` → report "left to the 15-min reconciler", no
+   retry loop. Never `--purge-retired-volumes` (deletes data — the owner's call).
+8. **Keep actions:** append each selected `keep` to `.claude/tidy-keep`.
+9. **Re-check the path** — a dev server that outlived the teardown recreates it as
    build output; files newer than the teardown give it away.
 
 ## Arguments
@@ -197,13 +236,14 @@ the batch and is reported, never acted on with older evidence.
 Bare word → restrict to that slug/branch. Empty → whole repo (cwd). `all` →
 cross-repo sweep: discover via `find ~/Work/Projects -maxdepth 4 -type d -name
 .worktrees` plus any repo a `wt-*`/`wk-*` compose project's `working_dir` label
-points at; audit per repo (subagents fine, ≤ 4 at a time), one consolidated report,
+or a Devbox workspace's `apps[].sync` points at; audit per repo (subagents fine, ≤ 4 at a time), one consolidated report,
 ONE batched confirmation, execute per repo under the same rules.
 
 ## Report
 
-Resolved (merged · removed local/remote/worktrees/stacks) · disk reclaimed ·
-kept-and-why · holders refused · merge items aborted-and-why.
+Resolved (merged · removed local/remote/worktrees/stacks · workspaces reaped or
+left to the reconciler) · disk reclaimed · kept-and-why · holders and workspaces
+refused · merge items aborted-and-why.
 
 ## Related
-`/prm` (open-PR resolution and post-merge teardown) · `/wk:cleanup` (FixIt's engine) · `/me:cleanup:processes` (machine-wide)
+`/prm` (open-PR resolution and post-merge teardown) · `/wk:cleanup` (FixIt's engine) · `/me:cleanup:processes` (machine-wide) · `devbox` skill (workspace verbs)
