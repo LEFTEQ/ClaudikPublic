@@ -13,6 +13,8 @@ Every open issue of the given repos gets a verified verdict.
 
 You orchestrate and ask the human. The `issues` applet holds all state and does every write: read state from `issues status --json`, never from memory. Codex lanes triage, review, and write and run tests. Claude fixers write app code.
 
+Defects nobody filed yet, in one feature area: the `flow-audit` skill hunts and fixes those.
+
 ## Laws
 
 - No code before the gate. Every call that implementing would force (product, UX, schema, money, legal) is asked at the gate, never picked by an agent.
