@@ -48,6 +48,21 @@ func TestSelectedExcludeWins(t *testing.T) {
 	}
 }
 
+func TestMarkedByClaimsTheMarkersSubtree(t *testing.T) {
+	m := &Manifest{ExcludeMarked: []Marker{{File: ".toolbox-package.json", Why: "installer-owned"}}}
+	has := func(p string) bool { return p == "skills/managed/.toolbox-package.json" }
+	for _, p := range []string{"skills/managed/SKILL.md", "skills/managed/references/a.md"} {
+		if mk, dir, ok := m.MarkedBy(p, has); !ok || dir != "skills/managed" || mk.Why != "installer-owned" {
+			t.Errorf("MarkedBy(%q) = %+v, %q, %v; want claimed by skills/managed", p, mk, dir, ok)
+		}
+	}
+	for _, p := range []string{"skills/own/SKILL.md", "skills/managed-extra/SKILL.md", "CLAUDE.md"} {
+		if _, _, ok := m.MarkedBy(p, has); ok {
+			t.Errorf("MarkedBy(%q) claimed an unmarked path", p)
+		}
+	}
+}
+
 func denyRule(name, pattern string) Deny {
 	return Deny{Name: name, Pattern: pattern, re: regexp.MustCompile(pattern)}
 }

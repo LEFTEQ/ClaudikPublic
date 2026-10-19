@@ -54,6 +54,7 @@ func Render(repo string, m *Manifest) (*Report, error) {
 		return nil, err
 	}
 	rep := &Report{}
+	has := markerLookup(repo, tracked)
 	for _, rel := range tracked {
 		ok, rule := m.Selected(rel)
 		if !ok {
@@ -62,6 +63,10 @@ func Render(repo string, m *Manifest) (*Report, error) {
 				why = fmt.Sprintf("%s (%s)", why, rule.Path)
 			}
 			rep.Skipped = append(rep.Skipped, SkipRecord{Path: rel, Why: why})
+			continue
+		}
+		if mk, dir, marked := m.MarkedBy(rel, has); marked {
+			rep.Skipped = append(rep.Skipped, SkipRecord{Path: rel, Why: fmt.Sprintf("%s (%s in %s)", mk.Why, mk.File, dir)})
 			continue
 		}
 
@@ -118,6 +123,24 @@ func Render(repo string, m *Manifest) (*Report, error) {
 		return rep.Violations[i].Line < rep.Violations[j].Line
 	})
 	return rep, nil
+}
+
+// markerLookup answers whether a repo-relative file is tracked or present on
+// disk. Both count: a marker an installer wrote but nobody committed still
+// claims the tracked files beside it.
+func markerLookup(repo string, tracked []string) func(string) bool {
+	known := make(map[string]bool, len(tracked))
+	for _, rel := range tracked {
+		known[rel] = true
+	}
+	return func(rel string) bool {
+		if seen, ok := known[rel]; ok {
+			return seen
+		}
+		_, err := os.Lstat(filepath.Join(repo, rel))
+		known[rel] = err == nil
+		return known[rel]
+	}
 }
 
 // scan applies every deny rule to a rendered file, honouring scoped allows.

@@ -17,17 +17,27 @@ type Manifest struct {
 	Remote string `json:"remote"`
 	// DenyStringsFile reuses the commit guard's literal deny list (infra IPs)
 	// rather than copying those values into a second place.
-	DenyStringsFile string     `json:"denyStringsFile"`
-	Include         []string   `json:"include"`
-	Exclude         []Rule     `json:"exclude"`
-	Overrides       []Override `json:"overrides"`
-	Rewrite         []Rewrite  `json:"rewrite"`
-	Deny            []Deny     `json:"deny"`
-	Allow           []Allow    `json:"allow"`
+	DenyStringsFile string   `json:"denyStringsFile"`
+	Include         []string `json:"include"`
+	Exclude         []Rule   `json:"exclude"`
+	// ExcludeMarked drops every file under a directory holding one of these
+	// marker files, so an installer-owned payload stays out by its own
+	// metadata (the tools repo writes .toolbox-package.json into each skill and mod it
+	// installs) and the next install needs no manifest line.
+	ExcludeMarked []Marker   `json:"excludeMarked"`
+	Overrides     []Override `json:"overrides"`
+	Rewrite       []Rewrite  `json:"rewrite"`
+	Deny          []Deny     `json:"deny"`
+	Allow         []Allow    `json:"allow"`
 }
 
 type Rule struct {
 	Path string `json:"path"`
+	Why  string `json:"why"`
+}
+
+type Marker struct {
+	File string `json:"file"`
 	Why  string `json:"why"`
 }
 
@@ -175,6 +185,21 @@ func (m *Manifest) Selected(path string) (bool, Rule) {
 		}
 	}
 	return true, Rule{}
+}
+
+// MarkedBy reports the marker that claims a repo-relative path: one sitting in
+// the path's own directory or any ancestor below the repo root. has answers
+// whether a repo-relative file exists (tracked or on disk), so an untracked
+// marker beside tracked files still excludes them.
+func (m *Manifest) MarkedBy(path string, has func(string) bool) (Marker, string, bool) {
+	for dir := filepath.Dir(path); dir != "." && dir != "/" && dir != ""; dir = filepath.Dir(dir) {
+		for _, mk := range m.ExcludeMarked {
+			if has(filepath.Join(dir, mk.File)) {
+				return mk, dir, true
+			}
+		}
+	}
+	return Marker{}, "", false
 }
 
 func (m *Manifest) OverrideFor(path string) (Override, bool) {
