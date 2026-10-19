@@ -26,6 +26,7 @@ user overrides it.
 | Default matrix | tiers 1 (client network, blip on the API leg), 2 (app lifecycle), 4 (input and UI pitfalls) |
 | `full` adds | `app-chrome.md`: every touched screen × lane × theme × the default locale over `polish-kit shoot`, with `polish-kit sheet` for the side-by-sides and edge crops; recordings for §5 |
 | Smoothness in scope | the perf lane of SKILL.md "Specialist lanes" on a physical phone, at any intensity |
+| Motion in scope | the motion lane of SKILL.md "Specialist lanes" on the lane's simulator or emulator, at any intensity |
 | Evidence | one board per pass; each shot names the device and OS version |
 
 Booting a lane is the repo's job (its sim or device command); `polish-kit

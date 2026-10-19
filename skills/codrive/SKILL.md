@@ -5,14 +5,14 @@ description: 'Use when a browser flow can only finish with the human at the keyb
 
 Drive the browser flow in $ARGUMENTS (a URL, a parked plan, or a description) end-to-end in the **Onyx browser**: first `mcp__onyx__browser_start(session: $CLAUDE_CODE_SESSION_ID, headless: false, idle_timeout_seconds: 3600)`, then drive it with the playwright / chrome-devtools MCP tools, which attach to that same window by session lookup (`claude-guards browser` blocks them otherwise). Vault sign-ins go through `web_login` / `browser_fill` with the same `session`. Empty args → drive the flow already under discussion this session; if there is none, ask what to drive.
 
-You drive; the human is the identity. The Onyx window is visible, carries the Onyx extension, and is shared — the user acts in it directly when needed.
+You drive; the human is the identity. `headless: false` moves the session into the Onyx **codrive window**: a headed Helium, separate from the headless AI browser every agent works in, carrying the Onyx extension and the AI browser's sign-ins. It opens unfocused and nothing automated ever brings it forward, so at each gate tell the user to switch to it themselves. The session's endpoint changes on the move, so refresh your element refs before your next action. With a filled login form still on screen (a 2FA gate), use chrome-devtools `take_snapshot`, never a Playwright snapshot (step 4). The first playwright / chrome-devtools call after a move can fail once ("Target page, context or browser has been closed") while the wrapper re-attaches; retry it. What they sign into there is copied back for every session.
 
 1. Before touching the browser, restate the flow as a short gate map: which steps you click through, which need the human (login, 2FA, eObčanka/card reader, payment, biometrics, legal consent).
 2. Drive every non-identity step yourself; verify each transition with a snapshot before the next action.
 3. At an identity gate: stop driving, tell the user exactly what to do in the open window (which button, which card/reader), and wait for their go-ahead. If they'd rather you log in and onyx holds the credential, use onyx tooling — never handle secrets in plaintext or ask for them in chat.
    A verification code, confirmation link or password reset is **not** an identity gate — read it yourself from the shared test mailbox (below) and keep driving.
 4. After each gate, confirm the new state before resuming. After a sign-in, use `browser_wait_for` on text the signed-in page shows, never a snapshot. If the login hangs, the filled form is still on screen, and a Playwright snapshot prints field values. "Filled secrets" in `~/.claude/docs/toolbox/browser.md` covers what is masked and the safe alternatives. On rejection or error, report the exact on-screen text verbatim — don't retry blind.
-5. Finish with the browser left open at the end state; report what completed, what's pending, and where the flow is parked.
+5. Finish with the browser left open at the end state; report what completed, what's pending, and where the flow is parked. Work that continues without the human goes back to the headless AI browser with `browser_start(session, headless: true)`, which returns the session to the tabs it left.
 
 ## Email
 

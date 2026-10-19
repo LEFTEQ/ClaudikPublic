@@ -41,10 +41,10 @@ The per-target lanes, tiers and deep passes: `references/targets.md`.
 2. **Fix findings.** One at a time: reproduce, fix, verify live, commit path-scoped. `quick` ends here → step 7.
 3. **Map flows.** The feature's user flows × the mutations each performs (endpoint, DB write, external call). Flows × the target's tiers in `references/matrix.md` = the matrix; drop cells the feature cannot reach. `polish-kit run init --pass <n>` writes the ledger; `polish-kit run add-cell` records each matrix cell.
 4. **Lanes.** `polish-kit lanes --json` resolves every declared lane to a live device or host; a diagnostic's `fix` is the exact create or boot command. Boot only the lanes the plan names.
-5. **Run the matrix.** Per cell: set the fault or device state (`blip …`, `polish-kit lanes set <lane> --theme dark --nav 3button`), drive the flow, watch the recovery, `polish-kit cell <id> pass|fail --shot <png>`. Screenshot every failing cell. Fail → step 2 for that cell. `full` adds the target's deep pass from `references/targets.md` (app: `references/app-chrome.md` over `polish-kit shoot`; ui: `ui-loop run`; api: `references/api-deep.md`).
+5. **Run the matrix.** Per cell: set the fault or device state (`blip …`, `polish-kit lanes set <lane> --theme dark --nav 3button`; a lane's device can be its owner's phone, so theme, nav and text change only through `lanes set`, which records what the device held), drive the flow, watch the recovery, `polish-kit cell <id> pass|fail --shot <png>`. Screenshot every failing cell. Fail → step 2 for that cell. `full` adds the target's deep pass from `references/targets.md` (app: `references/app-chrome.md` over `polish-kit shoot`; ui: `ui-loop run`; api: `references/api-deep.md`).
    Access control (matrix tier 7): `blip api record on`, drive every flow once as the primary test user, `blip api record off`, then `blip api authz --as none` and `blip api authz --as env:OTHER_TOKEN` (a second test user in another tenant/role, logged in through the app's own login; the token reaches the env via onyx `run_command`, never pasted). Every candidate the report lists is a finding.
 6. **Evidence.** `polish-kit sheet` (contact and edge sheets per screen), `polish-kit report` (the pass table with a delta against the previous pass). One vitrinka board per pass via `/vitrinka:publish`: the report, the sheets, screenshots of the fixed states.
-7. **Hand off.** `blip down --all`, `polish-kit lanes set <lane> --reset` for every lane touched, app left running on the device, then `/prm` on the existing PR with the board URL and the report in its body.
+7. **Hand off.** `blip down --all`, `polish-kit lanes set <lane> --reset` for every lane touched (a `prior-elsewhere` warning names a record for another device: reset that one too), the matrix rows' own resets (rotation, Doze), a physical iPhone's Settings put back by hand, app left running on the device, then `/prm` on the existing PR with the board URL and the report in its body.
 
 ## Specialist lanes
 
@@ -63,6 +63,14 @@ Linked evidence a human reviews, never a gate: polish-kit verdicts, the
   --lease <t> --out <png>` of the screen). A ui-loop fix for
   smoothness names the run dir in its checkpoint `note`. perflab's verdict
   stays perflab's; the cell is your reviewed reading of it.
+- **Motion** (a finding about an animation, or a touched `app` screen whose
+  animation, transition or gesture morph changed): the `motion-check` skill,
+  which records the golden run and reviews every motion's frames and measured
+  landings. Record it as a matrix cell (`polish-kit run add-cell --kind matrix
+  --lane <lane> --flow "<motion>" --tier motion`) closed with `polish-kit cell
+  <id> pass --note "<run>: clean"`, or on a defect `polish-kit cell <id> fail
+  --shot <the sheet showing it> --note "<run>: <verdict, frames>"`. The
+  workflow's verdict stays its own; the cell is your reviewed reading of it.
 - **Model-backed behaviour** (a journey, render, stream or error state that
   depends on a model's answer): its own campaign through the `eval-campaign`
   skill, with its own plan, ledger and verdict. Polish drives the UI around

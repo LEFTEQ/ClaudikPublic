@@ -150,6 +150,7 @@ Consolidate: journeys verified, specs written, bugs found / fixed / deferred, **
 - **testId audit.** Web = `data-testid`, RN = `testID`. During discovery, flag interactive elements missing a stable id and any fragile selector (`getByText` literal / `.nth()` / CSS) the specs would otherwise need. The writer prefers stable ids; when one is missing it emits a `.fixme()` + a one-line "add testid `<x>` to `<component>`" note rather than shipping a brittle selector.
 - **misleading-text.** Opportunistically check label-vs-outcome while driving: a "Save" that fires DELETE, a "Cancel" that mutates, a "permanent" confirm over a soft-delete. Cheap, high-signal — record as a finding.
 - **Text-mode first.** Answer "which screen / is this disabled / did the mutation land" from the a11y tree / DOM / network log, not pixels. Screenshots are **evidence only** (a real visual bug, a before/after fix pair) via `references/snap.sh` → `.e2e/.screenshots/`; a browser-MCP raw lands in `<ABS worktree>/.vitrinka/mcp/` first and `snap_post` converts it (`references/playwright-driver.md`).
+- **Motion is not an end state.** A spec asserts where an animation ends; how it gets there (a fold that lands off its target, a part left behind, a jump at a hand-off) is checked from a recording of the spec run with the `motion-check` skill, never from its assertions.
 
 ## Files map
 

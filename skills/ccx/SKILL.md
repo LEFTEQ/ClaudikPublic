@@ -73,7 +73,7 @@ they are ordinary subagents, with a row in the subagent view, background runs an
 |---|---|
 | user test / usertest, "QA this like a user" | sidekick, `usertest` brief |
 | verify a change in the running web app or Expo app (browser, simulator) | sidekick, `verify` |
-| computer use: native or desktop apps | sidekick, `computer-use` |
+| computer use: native or desktop apps | a desk job (`toolbox desk submit`, the `desk` skill): the desk worker runs the `computer-use` lane, so the native lock never lands in this session |
 | explore the app, map routes, journeys or testID gaps, e2e discovery, other bulk read-only mapping | sidekick, `explore` |
 | write e2e journeys and specs | the `e2e` skill, led here; its discovery agents and writers are `codex` agents |
 | write unit or integration tests, rework broken specs | sidekick, `e2e-write` |
@@ -155,7 +155,7 @@ toolbox ccx brief render --mode <mode> --goal "<…>" --scope "<routes, files, b
 | `explore` | mapping, e2e discovery, bulk read-only lookups | what to map |
 | `verify` (`--access`; `--ready`) | a change in the running web or Expo app | the change (what, files, sha), then the numbered expectations |
 | `usertest` (`--access`; `--gate` = a suite for lane 1; `--ready`) | user test, "QA this like a user": the lane runs the vitrinka `usertest` skill, its `finish` block comes back in `markdown` | the journeys and roles; the task id goes in `--scope` |
-| `computer-use` (`--access` = the app or window; `--ready`) | native or desktop apps | the steps, then the expected outcomes |
+| `computer-use` (`--access` = the app or window; `--ready`) | native or desktop apps — rendered by `desk serve` inside the desk worker, never from a coding session | the steps, then the expected outcomes |
 | `review` | code review or adversarial verification of a diff | what to judge it against |
 | `e2e-write` | writing tests, reworking broken specs; static, never run | the tests; for a rework, the app change (sha) that broke them |
 | `e2e-run` (`--gate` = the command, optional; `--ready`) | running specs, a grep or the suite | which specs |
@@ -186,7 +186,11 @@ each agent at its file:
 `agent("Your complete brief is the file <path>. Read it first and carry it out exactly.", {agentType: 'codex', schema: args.schemas[lane.mode]})`.
 An `ASK_FORBIDDEN` refusal names the route: a commit, push, PR or file is the
 parent's after the lane, a rollout or app-source authoring stays here or goes to
-an unnamed Claude subagent. The user's own words asking Codex to author source
+an unnamed Claude subagent. That subagent's type follows this session's runtime: no
+`subagent_type` on Claude, `subagent_type: "opus"` on Codex, where `general-purpose`
+and `claude` inherit Codex; its model is read as `claude-*` from
+`subagents/agent-<id>.jsonl` (`.message.model`) before its work counts, and with no
+Claude type listed the work stops and is asked. The user's own words asking Codex to author source
 pass as `--approved "<their words>"`, which lifts that rule alone. Contract:
 the tools repo `docs/ccx.md`.
 

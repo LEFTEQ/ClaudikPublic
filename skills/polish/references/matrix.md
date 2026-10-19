@@ -26,9 +26,9 @@ Rows × the feature's flows = cells; "Correct" is the pass criterion. Commands a
 | Push while the flow is open | `xcrun simctl push booted <bundle> payload.json` · iOS only | no navigation hijack mid-input |
 | Permission revoked | `xcrun simctl privacy booted revoke <photos|camera|location> <bundle>` · `adb shell pm revoke <pkg> <permission>` | explains and offers settings, no crash |
 | Memory warning | Simulator menu Debug → Simulate Memory Warning · `adb shell am send-trim-memory <pkg> RUNNING_CRITICAL` | no lost input |
-| Rotation | Simulator ⌘← / ⌘→ · `adb shell settings put system accelerometer_rotation 0 && adb shell settings put system user_rotation 1` | layout and state hold |
-| Accessibility sizes / dark | `xcrun simctl ui booted content_size extra-extra-extra-large`, `xcrun simctl ui booted appearance dark` · `adb shell settings put system font_scale 1.3` | no clipped CTA, readable |
-| Doze / back stack (Android) | `adb shell dumpsys battery unplug && adb shell dumpsys deviceidle force-idle` (reset: `adb shell dumpsys battery reset`); `adb shell input keyevent KEYCODE_BACK` at each step | back never loses a submitted step or double-submits |
+| Rotation | Simulator ⌘← / ⌘→ · polish-kit does not record rotation, so note `adb shell settings get system accelerometer_rotation` and `… user_rotation` first, then `adb shell settings put system accelerometer_rotation 0 && adb shell settings put system user_rotation 1`; at hand-off put both noted values back with `settings put` | layout and state hold |
+| Accessibility sizes / dark | `polish-kit lanes set <lane> --text extra-extra-extra-large --theme dark` (iOS simulator) · `polish-kit lanes set <lane> --text 1.3 --theme dark` (Android). Never a raw `simctl ui` / `settings put font_scale` / `cmd uimode`: `lanes set` records what the device held, and only that record lets the hand-off `--reset` put it back. A physical iPhone answers `lane-unsupported`: note its Settings values, change them by hand, put them back by hand at hand-off | no clipped CTA, readable |
+| Doze / back stack (Android) | `adb shell dumpsys battery unplug && adb shell dumpsys deviceidle force-idle` (reset: `adb shell dumpsys deviceidle unforce && adb shell dumpsys battery reset`); `adb shell input keyevent KEYCODE_BACK` at each step | back never loses a submitted step or double-submits |
 
 ## 3. Web — browser
 
